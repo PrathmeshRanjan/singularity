@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
     useAccount,
     useWriteContract,
@@ -190,6 +190,16 @@ export default function SmartContractRecurringPayments() {
         string | null
     >(null);
 
+    // Ref to store subscription data at creation time
+    const subscriptionDataRef = useRef<{
+        payeeAddress: string;
+        chainId: number;
+        tokenAddress: string;
+        amount: string;
+        intervalSeconds: number;
+        maxPayments: string;
+    } | null>(null);
+
     // Form state for creating new subscriptions
     const [newSubscription, setNewSubscription] = useState({
         payeeAddress: "",
@@ -310,25 +320,143 @@ export default function SmartContractRecurringPayments() {
         loadSubscriptions();
     }, [loadSubscriptions]);
 
-    const handleSubscriptionConfirmed = useCallback(async () => {
-        try {
-            setSuccess("Subscription created successfully!");
-            setStep("complete");
-            setNewSubscription({
-                payeeAddress: "",
-                tokenAddress: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-                chainId: 8453,
-                amount: "",
-                intervalSeconds: 60,
-                maxPayments: "",
-            });
-            loadSubscriptions();
-        } catch (err: unknown) {
-            const errorMessage =
-                err instanceof Error ? err.message : "Unknown error occurred";
-            setError(`Failed to confirm subscription: ${errorMessage}`);
-        }
-    }, [loadSubscriptions]);
+    const handleSubscriptionConfirmed = useCallback(
+        async (subscriptionData: {
+            payeeAddress: string;
+            chainId: number;
+            tokenAddress: string;
+            amount: string;
+            intervalSeconds: number;
+            maxPayments: string;
+        }) => {
+            try {
+                setSuccess(
+                    "Subscription created successfully! Extracting subscription ID and storing in database..."
+                );
+
+                // Extract subscription ID from the transaction receipt
+                let subscriptionIdFromEvent: string | undefined;
+
+                if (createReceipt && createReceipt.logs) {
+                    console.log(
+                        "Transaction receipt logs:",
+                        createReceipt.logs
+                    );
+                    console.log(
+                        "Contract address:",
+                        CONTRACT_ADDRESSES[subscriptionData.chainId]
+                    );
+
+                    // Find the SubscriptionCreated event in the logs using viem
+                    const eventLog = createReceipt.logs.find((log: any) => {
+                        try {
+                            // Check if this log is from our contract
+                            const isFromOurContract =
+                                log.address.toLowerCase() ===
+                                CONTRACT_ADDRESSES[
+                                    subscriptionData.chainId
+                                ].toLowerCase();
+
+                            if (isFromOurContract) {
+                                return (
+                                    isFromOurContract &&
+                                    log.topics &&
+                                    log.topics.length >= 4
+                                ); // 1 event signature + 3 indexed parameters
+                            }
+                            return false;
+                        } catch (err) {
+                            console.error("Error checking log:", err);
+                            return false;
+                        }
+                    });
+
+                    if (eventLog) {
+                        try {
+                            // Extract subscription ID from the first topic (indexed parameter)
+                            subscriptionIdFromEvent = eventLog.topics[1];
+                            console.log(
+                                "Event log found, subscription ID:",
+                                subscriptionIdFromEvent
+                            );
+                        } catch (err) {
+                            console.error(
+                                "Error extracting subscription ID:",
+                                err
+                            );
+                        }
+                    } else {
+                        console.error(
+                            "No SubscriptionCreated event found in logs"
+                        );
+                    }
+                }
+
+                if (!subscriptionIdFromEvent) {
+                    setError(
+                        "Failed to extract subscription ID from transaction receipt. Please try again."
+                    );
+                    setStep("form");
+                    return;
+                }
+
+                // Prepare the API payload using the captured data
+                const apiPayload = {
+                    action: "create-subscription",
+                    subscriptionId: subscriptionIdFromEvent,
+                    subscriberAddress: address,
+                    payeeAddress: subscriptionData.payeeAddress,
+                    srcChainId: subscriptionData.chainId,
+                    srcTokenAddress: subscriptionData.tokenAddress,
+                    amount: parseUnits(
+                        subscriptionData.amount,
+                        tokenDecimals || 6
+                    ).toString(),
+                    intervalSeconds: subscriptionData.intervalSeconds,
+                    maxPayments: subscriptionData.maxPayments,
+                    txHash: createTxHash,
+                };
+
+                console.log("Debug - Complete API payload:", apiPayload);
+
+                // Call your API to store the subscription in the database
+                const response = await fetch("/api/recurring-payments-smart", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(apiPayload),
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    setSuccess(
+                        "Subscription created and stored successfully! Future payments will be executed automatically."
+                    );
+                    setStep("complete");
+                    setNewSubscription({
+                        payeeAddress: "",
+                        tokenAddress:
+                            "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+                        chainId: 8453,
+                        amount: "",
+                        intervalSeconds: 60,
+                        maxPayments: "",
+                    });
+                    loadSubscriptions();
+                } else {
+                    setError(`Failed to store subscription: ${data.error}`);
+                    setStep("form");
+                }
+            } catch (err: unknown) {
+                const errorMessage =
+                    err instanceof Error ? err.message : "Unknown error";
+                setError(`Error storing subscription: ${errorMessage}`);
+                console.error(err);
+                setStep("form");
+            }
+        },
+        [address, tokenDecimals, loadSubscriptions, createTxHash, createReceipt]
+    );
 
     // Handle approval confirmation
     useEffect(() => {
@@ -342,8 +470,10 @@ export default function SmartContractRecurringPayments() {
 
     // Handle subscription creation confirmation
     useEffect(() => {
-        if (isCreateConfirmed && createReceipt) {
-            handleSubscriptionConfirmed();
+        if (isCreateConfirmed && createReceipt && subscriptionDataRef.current) {
+            handleSubscriptionConfirmed(subscriptionDataRef.current);
+            // Clear the ref after use
+            subscriptionDataRef.current = null;
         }
     }, [isCreateConfirmed, createReceipt, handleSubscriptionConfirmed]);
 
@@ -432,6 +562,16 @@ export default function SmartContractRecurringPayments() {
         try {
             setLoading(true);
             setError(null);
+
+            // Store subscription data in ref before creating
+            subscriptionDataRef.current = {
+                payeeAddress: newSubscription.payeeAddress,
+                chainId: newSubscription.chainId,
+                tokenAddress: newSubscription.tokenAddress,
+                amount: newSubscription.amount,
+                intervalSeconds: newSubscription.intervalSeconds,
+                maxPayments: newSubscription.maxPayments,
+            };
 
             const amount = parseUnits(
                 newSubscription.amount,
