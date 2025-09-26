@@ -1,0 +1,10 @@
+[2025-09-25 20:53:43] === Recurring Payments Cron Job Started ===
+[2025-09-25 20:53:44] Starting recurring payments processing...
+[2025-09-25 20:53:44] SUCCESS: 
+[2025-09-25 20:53:44] === Recurring Payments Cron Job Completed ===
+[2025-09-25 20:53:44] 
+2025-09-26 22:23:14 - Starting recurring payments processing...
+2025-09-26 22:23:15 - Application is reachable. Processing payments...
+2025-09-26 22:23:22 - API call successful. Response: {"success":true,"message":"Processed 2 subscriptions","processed":2,"successful":1,"failed":1,"results":[{"subscriptionId":"temp_1758887015588_7u2akv0wn","status":"error","error":"invalid BytesLike value (argument=\"value\", value=\"temp_1758887015588_7u2akv0wn\", code=INVALID_ARGUMENT, version=6.15.0)","message":"Payment execution failed"},{"subscriptionId":"0x8dd956bd9037368bef84dd6d9375ee588eef5697fb77b211a91a2dbe0ce872b6","status":"success","txHash":"0x62c1968505da751f0b6a45e7442b5704c2a3f326e1d9e9558870827cec4bd90a","message":"Payment executed successfully"}]}
+2025-09-26 22:23:22 - Payments processed successfully
+2025-09-26 22:23:22 - Recurring payments processing completed.
