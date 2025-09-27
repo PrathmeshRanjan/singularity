@@ -58,12 +58,16 @@ export async function POST(request: Request) {
   const service = new SmartContractRecurringPaymentsService();
   
   try {
+    console.log("🚀 API Route: POST /api/recurring-payments-smart called");
     await service.connect();
+    console.log("✅ API Route: Database service connected");
     
     const body = await request.json();
+    console.log("📋 API Route: Request body received:", JSON.stringify(body, null, 2));
     const { action } = body;
 
     if (action === "create-subscription") {
+      console.log("🎯 API Route: Processing create-subscription action");
       // Store subscription data in database (smart contract interaction happens on frontend)
       const { 
         subscriptionId,
@@ -77,13 +81,27 @@ export async function POST(request: Request) {
         txHash
       } = body;
 
+      console.log("🔍 API Route: Extracted fields:", {
+        subscriptionId,
+        subscriberAddress,
+        payeeAddress,
+        srcChainId,
+        srcTokenAddress,
+        amount,
+        intervalSeconds,
+        maxPayments,
+        txHash
+      });
+
       if (!subscriptionId || !subscriberAddress || !payeeAddress || !srcChainId || !srcTokenAddress || !amount || !intervalSeconds || !maxPayments || !txHash) {
+        console.error("❌ API Route: Missing required fields");
         return NextResponse.json(
           { error: "Missing required fields" },
           { status: 400 }
         );
       }
 
+      console.log("💾 API Route: Calling service.storeSubscription...");
       // Store the subscription in the database
       const storedSubscriptionId = await service.storeSubscription(
         subscriptionId,
@@ -97,15 +115,22 @@ export async function POST(request: Request) {
         txHash
       );
 
-      // Get the stored subscription
-      const subscription = await service.getSubscriptionDetails(storedSubscriptionId);
+      console.log("✅ API Route: Subscription stored with ID:", storedSubscriptionId);
 
-      return NextResponse.json({ 
+      // Get the stored subscription
+      console.log("📖 API Route: Retrieving stored subscription details...");
+      const subscription = await service.getSubscriptionDetails(storedSubscriptionId);
+      console.log("📋 API Route: Retrieved subscription:", subscription);
+
+      const response = { 
         success: true, 
         subscriptionId: storedSubscriptionId, 
         subscription,
         message: "Subscription stored successfully" 
-      });
+      };
+      console.log("🎉 API Route: Sending success response:", response);
+
+      return NextResponse.json(response);
     }
 
     if (action === "pause-subscription") {

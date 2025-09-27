@@ -99,6 +99,22 @@ export default function CardDashboard({
             Send
           </button>
         </Link>
+        <Link 
+          href="/profile" 
+          className={`flex-1 ${
+            pathname === '/profile' 
+              ? 'opacity-100' 
+              : 'opacity-80 hover:opacity-100 text-green-800'
+          }`}
+        >
+          <button className={`w-full backdrop-blur-sm cursor-pointer py-3 px-4 rounded-2xl font-medium transition-colors ${
+            pathname === '/profile'
+              ? 'bg-gray-900/90 text-white'
+              : 'hover:bg-white/40 text-green-800'
+          }`}>
+            Profile
+          </button>
+        </Link>
       </div>
     </div>
   );

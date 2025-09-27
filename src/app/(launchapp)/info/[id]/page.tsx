@@ -13,6 +13,7 @@ import {
   useSwitchChain,
 } from "wagmi";
 import { parseUnits } from "viem";
+import { ethers } from "ethers";
 
 type PaymentData = {
   network: string;
@@ -55,6 +56,14 @@ const CONTRACT_ADDRESSES: Record<number, `0x${string}`> = {
   1: "0x0000000000000000000000000000000000000000", // Ethereum
   42161: "0x0000000000000000000000000000000000000000", // Arbitrum
   137: "0x0000000000000000000000000000000000000000", // Polygon
+};
+
+// RPC URLs for different chains
+const RPC_URLS: Record<number, string> = {
+  8453: "https://mainnet.base.org",
+  1: "https://ethereum-rpc.publicnode.com",
+  42161: "https://arb1.arbitrum.io/rpc",
+  137: "https://polygon-rpc.com",
 };
 
 const RECURRING_PAYMENTS_ABI = [
@@ -135,14 +144,21 @@ export default function InfoPage() {
     error: createSubscriptionError,
   } = useWriteContract();
 
+  // State to store the actual subscription ID from the smart contract
+  const [subscriptionId, setSubscriptionId] = useState<string | null>(null);
+
   // Transaction receipt hooks
   const { isLoading: isApproveConfirming, isSuccess: isApproveSuccess, error: approveReceiptError } =
     useWaitForTransactionReceipt({
       hash: approveTxHash,
     });
 
-  const { isLoading: isCreateConfirming, isSuccess: isCreateSuccess, error: createReceiptError } =
-    useWaitForTransactionReceipt({
+  const { 
+    isLoading: isCreateConfirming, 
+    isSuccess: isCreateSuccess, 
+    error: createReceiptError,
+    data: createReceipt 
+  } = useWaitForTransactionReceipt({
       hash: createSubscriptionTxHash,
     });
 
@@ -332,13 +348,130 @@ export default function InfoPage() {
     }
   }, [isApproveSuccess, paymentData, writeCreateSubscription]);
 
+  // Extract subscription ID from transaction receipt
+  useEffect(() => {
+    if (isCreateSuccess && createReceipt && createSubscriptionTxHash) {
+      const extractSubscriptionId = async () => {
+        try {
+          // Get the provider and contract to read the logs
+          const chainId = paymentData ? getChainIdFromNetwork(paymentData.network) : 8453;
+          const provider = new ethers.JsonRpcProvider(RPC_URLS[chainId] || RPC_URLS[8453]);
+          const contract = new ethers.Contract(
+            CONTRACT_ADDRESSES[chainId],
+            RECURRING_PAYMENTS_ABI,
+            provider
+          );
+
+          // Parse the logs to find the SubscriptionCreated event
+          const logs = createReceipt.logs;
+          
+          if (!logs || logs.length === 0) {
+            console.warn('No logs found in transaction receipt');
+            setSubscriptionId(createSubscriptionTxHash);
+            return;
+          }
+
+          // Find the SubscriptionCreated event in the logs
+          let subscriptionCreatedEvent = null;
+          for (const log of logs) {
+            try {
+              const parsedLog = contract.interface.parseLog({
+                topics: log.topics,
+                data: log.data,
+              });
+              if (parsedLog && parsedLog.name === 'SubscriptionCreated') {
+                subscriptionCreatedEvent = parsedLog;
+                break;
+              }
+            } catch (parseError) {
+              // Continue to next log if this one can't be parsed
+              continue;
+            }
+          }
+
+          if (subscriptionCreatedEvent && subscriptionCreatedEvent.name === 'SubscriptionCreated') {
+            const extractedSubscriptionId = subscriptionCreatedEvent.args.subscriptionId;
+            console.log('Extracted subscription ID:', extractedSubscriptionId);
+            setSubscriptionId(extractedSubscriptionId);
+          } else {
+            console.warn('Could not find SubscriptionCreated event in transaction logs, using transaction hash as fallback');
+            // Fallback to using transaction hash as subscription ID
+            setSubscriptionId(createSubscriptionTxHash);
+          }
+        } catch (error) {
+          console.error('Error extracting subscription ID:', error);
+          // Fallback to using transaction hash as subscription ID
+          setSubscriptionId(createSubscriptionTxHash);
+        }
+      };
+
+      extractSubscriptionId();
+    }
+  }, [isCreateSuccess, createReceipt, createSubscriptionTxHash, paymentData]);
+
   // Handle create subscription success
   useEffect(() => {
-    if (isCreateSuccess) {
-      setAutoPaySuccess("Auto pay subscription created successfully!");
-      setAutoPayLoading(false);
+    if (isCreateSuccess && createSubscriptionTxHash && paymentData && subscriptionId) {
+      // Store subscription data in database
+      const storeSubscriptionInDatabase = async () => {
+        try {
+          const chainId = getChainIdFromNetwork(paymentData.network);
+          const tokenAddress = getTokenAddress(paymentData.token, chainId);
+          const intervalSeconds = parseFrequencyToSeconds(paymentData.frequency);
+          const maxPayments = parseDurationToMaxPayments(paymentData.duration);
+          
+          // Use the extracted subscription ID from the smart contract
+          
+          const response = await fetch('/api/recurring-payments-smart', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              action: 'create-subscription',
+              subscriptionId: subscriptionId,
+              subscriberAddress: address,
+              payeeAddress: paymentData.walletAddress,
+              srcChainId: chainId,
+              srcTokenAddress: tokenAddress,
+              amount: paymentData.amount,
+              intervalSeconds: intervalSeconds,
+              maxPayments: maxPayments,
+              txHash: createSubscriptionTxHash,
+            }),
+          });
+
+          if (response.ok) {
+            const result = await response.json();
+            console.log('Subscription stored in database:', result);
+            setAutoPaySuccess("Auto pay subscription created and stored successfully!");
+            setAutoPayError(null); // Clear any previous errors
+          } else {
+            let errorMessage = 'Unknown error';
+            try {
+              const errorData = await response.json();
+              errorMessage = errorData.error || errorData.message || 'Unknown error';
+            } catch (parseError) {
+              console.error('Failed to parse error response:', parseError);
+              errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+            }
+            console.error('Failed to store subscription in database:', errorMessage);
+            setAutoPayError(`Subscription created but failed to store in database: ${errorMessage}`);
+            setAutoPaySuccess(null); // Clear any previous success messages
+          }
+        } catch (error) {
+          console.error('Error storing subscription in database:', error);
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          setAutoPayError(`Subscription created but failed to store in database: ${errorMessage}`);
+          setAutoPaySuccess(null); // Clear any previous success messages
+        } finally {
+          setAutoPayLoading(false);
+        }
+      };
+
+      storeSubscriptionInDatabase();
     }
-  }, [isCreateSuccess]);
+  }, [isCreateSuccess, createSubscriptionTxHash, paymentData, address, subscriptionId]);
 
   // Handle approve errors
   useEffect(() => {
