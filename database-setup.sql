@@ -1,131 +1,66 @@
--- Smart Contract Recurring Payments Database Setup
--- Run this script in your PostgreSQL database
+-- Fixed migration script to add cross-chain support to existing database
+-- This safely updates your existing tables without losing data
 
--- Drop existing tables if they exist (for clean setup)
-DROP TABLE IF EXISTS payment_executions CASCADE;
-DROP TABLE IF EXISTS cross_chain_payments CASCADE;
-DROP TABLE IF EXISTS subscription_plans CASCADE;
-DROP TABLE IF EXISTS contract_deployments CASCADE;
-DROP TABLE IF EXISTS authorized_executors CASCADE;
+-- First, let's check what columns exist in fusion_orders table
+-- and add the missing subscription_id column if it doesn't exist
+DO $$
+BEGIN
+    -- Add subscription_id column to fusion_orders if it doesn't exist
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'fusion_orders' 
+        AND column_name = 'subscription_id'
+    ) THEN
+        ALTER TABLE fusion_orders ADD COLUMN subscription_id VARCHAR(66);
+        RAISE NOTICE 'Added subscription_id column to fusion_orders table';
+    ELSE
+        RAISE NOTICE 'subscription_id column already exists in fusion_orders table';
+    END IF;
+END $$;
 
--- Create subscription_plans table
-CREATE TABLE subscription_plans (
-    subscription_id VARCHAR(66) PRIMARY KEY,
-    subscriber_address VARCHAR(42) NOT NULL,
-    payee_address VARCHAR(42) NOT NULL,
-    src_chain_id INTEGER NOT NULL,
-    src_token_address VARCHAR(42) NOT NULL,
-    payment_amount VARCHAR(78) NOT NULL,
-    interval_seconds INTEGER NOT NULL,
-    max_payments INTEGER NOT NULL,
-    payments_made INTEGER DEFAULT 0,
-    last_payment_at TIMESTAMP,
-    next_payment_due TIMESTAMP NOT NULL,
-    is_active BOOLEAN DEFAULT TRUE,
-    is_paused BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW(),
-    contract_address VARCHAR(42) NOT NULL,
-    tx_hash VARCHAR(66) NOT NULL
-);
+-- Now add cross-chain columns to existing subscription_plans table
+ALTER TABLE subscription_plans 
+ADD COLUMN IF NOT EXISTS dst_chain_id INTEGER DEFAULT 1, -- Always Ethereum
+ADD COLUMN IF NOT EXISTS dst_token_address VARCHAR(42) DEFAULT '0x6c3ea9036406852006290770BEdFcAbA0e23a0e8', -- PYUSD
+ADD COLUMN IF NOT EXISTS is_cross_chain BOOLEAN DEFAULT false,
+ADD COLUMN IF NOT EXISTS fusion_order_hash VARCHAR(66);
 
-p0[-==]-[p0o9ik8fredcs` `1232QWASXEZXCVA ,.L;/"
-
-'==765p09`` "]
-
--- Create payment_executions table
-CREATE TABLE payment_executions (
-    execution_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    subscription_id VARCHAR(66) NOT NULL,
-    amount VARCHAR(78) NOT NULL,
-    tx_hash VARCHAR(66),
-    fusion_order_hash VARCHAR(66),
-    status VARCHAR(20) NOT NULL CHECK (status IN ('pending', 'completed', 'failed')),
-    executed_at TIMESTAMP DEFAULT NOW(),
-    error_message TEXT,
-    gas_used VARCHAR(20),
-    block_number BIGINT,
-    FOREIGN KEY (subscription_id) REFERENCES subscription_plans(subscription_id) ON DELETE CASCADE
-);
-
--- Create cross_chain_payments table
-CREATE TABLE cross_chain_payments (
-    payment_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    subscription_id VARCHAR(66) NOT NULL,
-    src_chain_id INTEGER NOT NULL,
-    dst_chain_id INTEGER NOT NULL,
-    src_token_address VARCHAR(42) NOT NULL,
-    dst_token_address VARCHAR(42) NOT NULL,
-    amount VARCHAR(78) NOT NULL,
-    fusion_order_hash VARCHAR(66),
-    status VARCHAR(20) NOT NULL CHECK (status IN ('pending', 'completed', 'failed')),
-    created_at TIMESTAMP DEFAULT NOW(),
-    executed_at TIMESTAMP,
-    error_message TEXT,
-    FOREIGN KEY (subscription_id) REFERENCES subscription_plans(subscription_id) ON DELETE CASCADE
-);
-
--- Create contract_deployments table
-CREATE TABLE contract_deployments (
-    id SERIAL PRIMARY KEY,
-    chain_id INTEGER NOT NULL,
-    contract_address VARCHAR(42) NOT NULL,
-    deployed_at TIMESTAMP DEFAULT NOW(),
-    deployer_address VARCHAR(42) NOT NULL,
-    UNIQUE(chain_id, contract_address)
-);
-
--- Create authorized_executors table
-CREATE TABLE authorized_executors (
-    id SERIAL PRIMARY KEY,
-    address VARCHAR(42) NOT NULL,
-    chain_id INTEGER NOT NULL,
-    authorized_at TIMESTAMP DEFAULT NOW(),
-    UNIQUE(address, chain_id)
-);
+-- Update existing subscriptions to have cross-chain fields
+-- This sets all existing subscriptions to route to Ethereum PYUSD
+UPDATE subscription_plans 
+SET 
+    dst_chain_id = 1, -- Ethereum
+    dst_token_address = '0x6c3ea9036406852006290770BEdFcAbA0e23a0e8', -- PYUSD
+    is_cross_chain = CASE 
+        WHEN src_chain_id != 1 THEN true  -- Cross-chain if not already on Ethereum
+        ELSE false  -- Same-chain if already on Ethereum
+    END
+WHERE dst_chain_id IS NULL;
 
 -- Create indexes for better performance
-CREATE INDEX idx_subscription_plans_subscriber ON subscription_plans(subscriber_address);
-CREATE INDEX idx_subscription_plans_payee ON subscription_plans(payee_address);
-CREATE INDEX idx_subscription_plans_next_payment ON subscription_plans(next_payment_due);
-CREATE INDEX idx_subscription_plans_active ON subscription_plans(is_active, is_paused);
-CREATE INDEX idx_payment_executions_subscription ON payment_executions(subscription_id);
-CREATE INDEX idx_payment_executions_status ON payment_executions(status);
-CREATE INDEX idx_cross_chain_payments_subscription ON cross_chain_payments(subscription_id);
+CREATE INDEX IF NOT EXISTS idx_fusion_orders_status 
+    ON fusion_orders(status);
 
--- Insert sample data for testing
-INSERT INTO contract_deployments (chain_id, contract_address, deployer_address) VALUES
-(8453, '0xacfDc1080a1D3839767b3714F581994958830754', '0x76015b059ecae4875F592085a5b495B4ADf37C96');
+CREATE INDEX IF NOT EXISTS idx_fusion_orders_created_at 
+    ON fusion_orders(created_at);
 
-INSERT INTO authorized_executors (address, chain_id) VALUES
-('0x76015b059ecae4875F592085a5b495B4ADf37C96', 8453);
+CREATE INDEX IF NOT EXISTS idx_fusion_orders_subscription_id 
+    ON fusion_orders(subscription_id);
 
--- Insert sample subscription for testing (optional)
--- INSERT INTO subscription_plans (
---     subscription_id, subscriber_address, payee_address, src_chain_id, 
---     src_token_address, payment_amount, interval_seconds, max_payments, 
---     payments_made, last_payment_at, next_payment_due, is_active, is_paused, 
---     contract_address, tx_hash
--- ) VALUES (
---     '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12',
---     '0x742d35Cc6634C0532925a3b8D4C9db96C4b4d8b6',
---     '0x6c3ea9036406852006290770bedfcaba0e23a0e8',
---     8453,
---     '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
---     '1000000',
---     60,
---     10,
---     0,
---     NULL,
---     NOW() + INTERVAL '1 minute',
---     TRUE,
---     FALSE,
---     '0xacfDc1080a1D3839767b3714F581994958830754',
---     '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890'
--- );
+CREATE INDEX IF NOT EXISTS idx_fusion_order_preparations_expires_at 
+    ON fusion_order_preparations(expires_at);
 
--- Create trigger to update updated_at timestamp
-CREATE OR REPLACE FUNCTION update_updated_at_column()
+CREATE INDEX IF NOT EXISTS idx_fusion_order_preparations_order_hash 
+    ON fusion_order_preparations(order_hash);
+
+CREATE INDEX IF NOT EXISTS idx_subscription_plans_cross_chain 
+    ON subscription_plans(is_cross_chain, is_active);
+
+CREATE INDEX IF NOT EXISTS idx_subscription_plans_src_chain 
+    ON subscription_plans(src_chain_id, is_active);
+
+-- Create trigger for fusion_orders updated_at
+CREATE OR REPLACE FUNCTION update_fusion_orders_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
     NEW.updated_at = NOW();
@@ -133,12 +68,44 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
-CREATE TRIGGER update_subscription_plans_updated_at 
-    BEFORE UPDATE ON subscription_plans 
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+-- Drop existing trigger if it exists and create new one
+DROP TRIGGER IF EXISTS update_fusion_orders_updated_at ON fusion_orders;
+CREATE TRIGGER update_fusion_orders_updated_at 
+    BEFORE UPDATE ON fusion_orders 
+    FOR EACH ROW 
+    EXECUTE FUNCTION update_fusion_orders_updated_at();
 
--- Grant permissions (adjust as needed for your setup)
--- GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO your_app_user;
--- GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO your_app_user;
+-- Add foreign key constraint for fusion_orders (only if it doesn't exist)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints 
+        WHERE constraint_name = 'fk_fusion_orders_subscription_id'
+    ) THEN
+        ALTER TABLE fusion_orders 
+        ADD CONSTRAINT fk_fusion_orders_subscription_id 
+        FOREIGN KEY (subscription_id) 
+        REFERENCES subscription_plans(subscription_id) 
+        ON DELETE CASCADE;
+        RAISE NOTICE 'Added foreign key constraint for fusion_orders.subscription_id';
+    ELSE
+        RAISE NOTICE 'Foreign key constraint already exists for fusion_orders.subscription_id';
+    END IF;
+END $$;
+
+-- Add comments for documentation
+COMMENT ON COLUMN subscription_plans.dst_chain_id IS 'Destination chain ID (always Ethereum for PYUSD)';
+COMMENT ON COLUMN subscription_plans.dst_token_address IS 'Destination token address (always PYUSD)';
+COMMENT ON COLUMN subscription_plans.is_cross_chain IS 'Whether this is a cross-chain payment';
+COMMENT ON COLUMN subscription_plans.fusion_order_hash IS '1inch Fusion+ order hash for cross-chain swaps';
+COMMENT ON COLUMN fusion_orders.subscription_id IS 'Associated subscription ID for cross-chain payments';
+
+-- Verify the migration
+SELECT 
+    'Migration completed successfully' as status,
+    COUNT(*) as existing_subscriptions,
+    COUNT(CASE WHEN is_cross_chain = true THEN 1 END) as cross_chain_subscriptions,
+    COUNT(CASE WHEN dst_chain_id = 1 THEN 1 END) as ethereum_destinations
+FROM subscription_plans;
 
 COMMIT;

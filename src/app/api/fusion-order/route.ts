@@ -1,36 +1,45 @@
-import {
-    HashLock,
-    NetworkEnum,
-    OrderParams,
-    PreparedOrder,
-    PresetEnum,
-    Quote,
-    QuoteParams,
-    RelayerRequest,
-    SDK,
-    SupportedChain,
-} from "@1inch/cross-chain-sdk";
-import type { LimitOrderV4Struct } from "@1inch/cross-chain-sdk";
-
-import crypto from "crypto";
-import { solidityPackedKeccak256 } from "ethers";
 import { NextResponse } from "next/server";
 import { Client } from "pg";
 import { v4 as uuidv4 } from "uuid";
+import { FusionSDKService } from "@/lib/fusion-sdk-service";
+import { createSingularitySwapParams, PYUSD_ETHEREUM } from "@/lib/constants";
+import { NetworkEnum } from "@1inch/cross-chain-sdk";
 
-const DEV_PORTAL_KEY = process.env.DEV_PORTAL_KEY;
 const DATABASE_URL = process.env.DATABASE_URL;
+const PRIVATE_KEY = process.env.PRIVATE_KEY;
 
-if (!DEV_PORTAL_KEY || !DATABASE_URL) {
+if (!DATABASE_URL || !PRIVATE_KEY) {
     throw new Error(
-        "Missing required environment variables: DEV_PORTAL_KEY or DATABASE_URL"
+        "Missing required environment variables: DATABASE_URL or PRIVATE_KEY"
     );
 }
 
-const sdk = new SDK({
-    url: "https://api.1inch.dev/fusion-plus",
-    authKey: DEV_PORTAL_KEY,
-});
+// Initialize the Fusion SDK service
+const fusionSDK = new FusionSDKService(PRIVATE_KEY);
+
+// Enhanced logging utility for API endpoints
+function logApiStep(step: string, data?: any) {
+  const timestamp = new Date().toISOString();
+  console.log(`\n🌐 [${timestamp}] API ENDPOINT - ${step}`);
+  if (data) {
+    console.log(`📊 Data:`, JSON.stringify(data, null, 2));
+  }
+  console.log("─".repeat(80));
+}
+
+function logApiSuccess(message: string, data?: any) {
+  const timestamp = new Date().toISOString();
+  console.log(`✅ [${timestamp}] API SUCCESS: ${message}`);
+  if (data) {
+    console.log(`📊 Result:`, JSON.stringify(data, null, 2));
+  }
+}
+
+function logApiError(message: string, error: any) {
+  const timestamp = new Date().toISOString();
+  console.log(`❌ [${timestamp}] API ERROR: ${message}`);
+  console.log(`🔍 Error Details:`, error);
+}
 
 function formatError(error: unknown): string {
     try {
@@ -82,21 +91,6 @@ function formatError(error: unknown): string {
     return error instanceof Error ? error.message : "An unknown error occurred";
 }
 
-function getStatusFromError(error: unknown, fallback: number): number {
-    if (
-        typeof error === "object" &&
-        error !== null &&
-        "response" in error &&
-        typeof (error as { response?: unknown }).response === "object" &&
-        (error as { response?: { status?: unknown } }).response !== null &&
-        typeof (error as { response: { status?: unknown } }).response.status ===
-            "number"
-    ) {
-        return (error as { response: { status: number } }).response.status;
-    }
-    return fallback;
-}
-
 // Helper to get a new DB client and connect
 async function getDbClient() {
     const client = new Client({
@@ -110,84 +104,39 @@ function replacer(key: string, value: unknown) {
     return typeof value === "bigint" ? value.toString() : value;
 }
 
-function srcChainFromQuote(quote: unknown): SupportedChain {
-    if (
-        typeof quote === "object" &&
-        quote !== null &&
-        "srcChainId" in quote &&
-        typeof (quote as { srcChainId?: unknown }).srcChainId === "number"
-    ) {
-        return (quote as { srcChainId: number }).srcChainId as SupportedChain;
-    }
-    return NetworkEnum.ARBITRUM as SupportedChain;
-}
-
-async function getQuoteWithRetry(
-    params: QuoteParams,
-    retries = 3
-): Promise<Quote> {
-    try {
-        return await sdk.getQuote(params);
-    } catch (err: unknown) {
-        if (
-            typeof err === "object" &&
-            err !== null &&
-            (err as { response?: { status?: number } }).response?.status ===
-                429 &&
-            retries > 0
-        ) {
-            const delay = (4 - retries) * 1000;
-            console.warn(`Rate limited. Retrying in ${delay}ms...`);
-            await new Promise((res) => setTimeout(res, delay));
-            return getQuoteWithRetry(params, retries - 1);
-        }
-        throw err;
-    }
-}
-
-// async function getOrderStatusWithRetry(
-//   orderHash: string,
-//   retries = 3
-// ): Promise<any> {
-//   try {
-//     return await sdk.getOrderStatus(orderHash);
-//   } catch (err: any) {
-//     if (err?.response?.status === 429 && retries > 0) {
-//       const delay = (4 - retries) * 1000;
-//       console.warn(
-//         `Rate limited getting order status. Retrying in ${delay}ms...`
-//       );
-//       await new Promise((res) => setTimeout(res, delay));
-//       return getOrderStatusWithRetry(orderHash, retries - 1);
-//     }
-//     throw err;
-//   }
-// }
-
 export async function GET(request: Request) {
     try {
         const { searchParams } = new URL(request.url);
         const action = searchParams.get("action");
         const orderHash = searchParams.get("orderHash");
 
+        logApiStep("GET REQUEST RECEIVED", {
+            action,
+            orderHash: orderHash ? orderHash.substring(0, 10) + "..." : null,
+            url: request.url
+        });
+
         if (action === "quote") {
             const srcChainIdStr =
                 searchParams.get("srcChainId") ||
                 NetworkEnum.ARBITRUM.toString();
-            const dstChainIdStr =
-                searchParams.get("dstChainId") ||
-                NetworkEnum.COINBASE.toString();
             const srcTokenAddress = searchParams.get("srcTokenAddress");
-            const dstTokenAddress = searchParams.get("dstTokenAddress");
             const amount = searchParams.get("amount");
             const walletAddress = searchParams.get("walletAddress");
 
-            if (
-                !walletAddress ||
-                !srcTokenAddress ||
-                !dstTokenAddress ||
-                !amount
-            ) {
+            logApiStep("PROCESSING QUOTE REQUEST", {
+                srcChainId: srcChainIdStr,
+                srcTokenAddress,
+                amount,
+                walletAddress: walletAddress ? walletAddress.substring(0, 10) + "..." : null
+            });
+
+            if (!walletAddress || !srcTokenAddress || !amount) {
+                logApiError("Missing required parameters for quote", {
+                    hasWalletAddress: !!walletAddress,
+                    hasSrcTokenAddress: !!srcTokenAddress,
+                    hasAmount: !!amount
+                });
                 return NextResponse.json(
                     { error: "Missing required parameters" },
                     { status: 400 }
@@ -195,45 +144,66 @@ export async function GET(request: Request) {
             }
 
             try {
-                const quoterRequestParams: QuoteParams = {
-                    srcChainId: parseInt(srcChainIdStr),
-                    dstChainId: parseInt(dstChainIdStr),
+                // Create swap parameters for Singularity (always to Ethereum PYUSD)
+                const swapParams = createSingularitySwapParams(
+                    parseInt(srcChainIdStr),
                     srcTokenAddress,
-                    dstTokenAddress,
                     amount,
-                    enableEstimate: true,
-                    walletAddress,
-                };
-                const quoteInstance: Quote = await getQuoteWithRetry(
-                    quoterRequestParams
+                    walletAddress
                 );
+
+                logApiStep("CREATING SWAP PARAMETERS", {
+                    srcChainId: swapParams.srcChainId,
+                    dstChainId: swapParams.dstChainId,
+                    srcTokenAddress: swapParams.srcTokenAddress,
+                    dstTokenAddress: swapParams.dstTokenAddress,
+                    amount: swapParams.amount,
+                    walletAddress: swapParams.walletAddress.substring(0, 10) + "..."
+                });
+
+                const quote = await fusionSDK.getQuote(swapParams);
                 const jsonSafeBody = JSON.parse(
                     JSON.stringify(
-                        { quoterRequestParams, quote: quoteInstance },
+                        { swapParams, quote },
                         replacer
                     )
                 );
+                
+                logApiSuccess("Quote request completed successfully", {
+                    srcAmount: quote.srcAmount?.toString(),
+                    dstAmount: quote.dstAmount?.toString(),
+                    recommendedPreset: quote.recommendedPreset
+                });
+
                 return NextResponse.json(jsonSafeBody);
             } catch (error: unknown) {
-                console.error("Error getting quote:", error);
+                logApiError("Error getting quote", error);
                 return NextResponse.json(
                     { error: formatError(error) },
                     { status: 400 }
                 );
             }
         } else if (action === "status" && orderHash) {
+            logApiStep("CHECKING ORDER STATUS", { orderHash });
+            
             const client = new Client(DATABASE_URL);
             try {
                 await client.connect();
-                // const orderStatus = await getOrderStatusWithRetry(orderHash);
                 const { rows } = await client.query(
                     "SELECT status, attempts FROM fusion_orders WHERE order_hash = $1",
                     [orderHash]
                 );
                 const status = rows[0] ? rows[0].status : "not_found";
+                
+                logApiSuccess("Order status retrieved", { 
+                    orderHash, 
+                    status,
+                    attempts: rows[0]?.attempts || 0
+                });
+                
                 return NextResponse.json({ status });
             } catch (error: unknown) {
-                console.error("Error getting order status:", error);
+                logApiError("Error getting order status", error);
                 return NextResponse.json(
                     { error: formatError(error) },
                     { status: 500 }
@@ -243,12 +213,13 @@ export async function GET(request: Request) {
             }
         }
 
+        logApiError("Invalid action or missing parameters", { action, orderHash });
         return NextResponse.json(
             { message: "Invalid action or missing parameters" },
             { status: 400 }
         );
     } catch (error: unknown) {
-        console.error("Unhandled error in GET handler:", error);
+        logApiError("Unhandled error in GET handler", error);
         return NextResponse.json(
             { error: formatError(error) },
             { status: 400 }
@@ -261,254 +232,132 @@ export async function POST(request: Request) {
         const body = await request.json();
         const { action } = body;
 
-        if (action === "prepare-order") {
-            const { quoterRequestParams, walletAddress } = body as {
-                quoterRequestParams: QuoteParams;
+        logApiStep("POST REQUEST RECEIVED", {
+            action,
+            hasBody: !!body
+        });
+
+        if (action === "create-swap") {
+            const { srcChainId, srcTokenAddress, amount, walletAddress } = body as {
+                srcChainId: number;
+                srcTokenAddress: string;
+                amount: string;
                 walletAddress: string;
             };
 
-            if (!quoterRequestParams || !walletAddress) {
+            logApiStep("PROCESSING CREATE SWAP REQUEST", {
+                srcChainId,
+                srcTokenAddress,
+                amount,
+                walletAddress: walletAddress ? walletAddress.substring(0, 10) + "..." : null
+            });
+
+            if (!srcChainId || !srcTokenAddress || !amount || !walletAddress) {
+                logApiError("Missing required parameters for create swap", {
+                    hasSrcChainId: !!srcChainId,
+                    hasSrcTokenAddress: !!srcTokenAddress,
+                    hasAmount: !!amount,
+                    hasWalletAddress: !!walletAddress
+                });
                 return NextResponse.json(
-                    { error: "Missing quoterRequestParams or walletAddress" },
+                    { error: "Missing required parameters" },
                     { status: 400 }
                 );
             }
 
             try {
-                const liveQuote = await getQuoteWithRetry(quoterRequestParams);
-                const preset: PresetEnum = liveQuote.recommendedPreset;
-                if (!preset)
-                    throw new Error(
-                        "Could not determine a preset from the quote."
-                    );
-
-                const presetData = liveQuote.presets[preset];
-                if (!presetData)
-                    throw new Error(
-                        `Preset data not found for preset: ${preset}`
-                    );
-
-                const secretsCount = presetData.secretsCount;
-                const secrets = Array.from({ length: secretsCount }).map(
-                    () =>
-                        "0x" +
-                        Buffer.from(crypto.randomBytes(32)).toString("hex")
+                // Create swap parameters for Singularity (always to Ethereum PYUSD)
+                const swapParams = createSingularitySwapParams(
+                    srcChainId,
+                    srcTokenAddress,
+                    amount,
+                    walletAddress
                 );
-                const secretHashes = secrets.map((s) => HashLock.hashSecret(s));
 
-                const hashLockInstance =
-                    secretsCount === 1
-                        ? HashLock.forSingleFill(secrets[0])
-                        : HashLock.forMultipleFills(
-                              secretHashes.map(
-                                  (secretHash, i) =>
-                                      solidityPackedKeccak256(
-                                          ["uint64", "bytes32"],
-                                          [BigInt(i), secretHash]
-                                      ) as unknown as string & {
-                                          _tag: "MerkleLeaf";
-                                      }
-                              )
-                          );
+                logApiStep("CREATING SWAP PARAMETERS", {
+                    srcChainId: swapParams.srcChainId,
+                    dstChainId: swapParams.dstChainId,
+                    srcTokenAddress: swapParams.srcTokenAddress,
+                    dstTokenAddress: swapParams.dstTokenAddress,
+                    amount: swapParams.amount,
+                    walletAddress: swapParams.walletAddress.substring(0, 10) + "..."
+                });
 
-                const crossChainOrderParams: OrderParams & {
-                    [k: string]: unknown;
-                } = {
+                // Get quote
+                logApiStep("GETTING QUOTE", { swapParams });
+                const quote = await fusionSDK.getQuote(swapParams);
+
+                // Create and submit order
+                logApiStep("CREATING AND SUBMITTING ORDER", {
+                    walletAddress: walletAddress.substring(0, 10) + "...",
+                    receiver: walletAddress.substring(0, 10) + "...",
+                    source: "singularity"
+                });
+
+                const orderResult = await fusionSDK.createOrder(quote, {
                     walletAddress,
                     receiver: walletAddress,
-                    preset: liveQuote.recommendedPreset,
-                    hashLock: hashLockInstance,
-                    secretHashes,
                     source: "singularity",
-                };
+                });
 
-                const fusionOrder: PreparedOrder = await sdk.createOrder(
-                    liveQuote,
-                    crossChainOrderParams
-                );
-                const typedData = fusionOrder.order.getTypedData(
-                    quoterRequestParams.srcChainId
-                );
-                if (
-                    !typedData ||
-                    !typedData.domain ||
-                    !typedData.types ||
-                    !typedData.message
-                ) {
-                    throw new Error(
-                        "Failed to construct EIP-712 typed data from the order created by SDK."
-                    );
-                }
+                logApiSuccess("Order created and submitted successfully", {
+                    orderHash: orderResult.hash,
+                    quoteId: orderResult.quoteId,
+                    secretsCount: orderResult.secrets.length,
+                    preset: orderResult.preset,
+                    source: orderResult.source
+                });
 
-                const typedDataPayload = {
-                    domain: typedData.domain,
-                    types: typedData.types,
-                    message: typedData.message,
-                    primaryType: typedData.primaryType || "Order",
-                };
-
-                const preparationId = uuidv4();
-                const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes from now
-                const orderStruct = fusionOrder.order.build(); // Build order struct once
-                const extensionData = fusionOrder.order.extension.encode(); // Encode extension once
-                const orderHash = fusionOrder.order.getOrderHash(
-                    quoterRequestParams.srcChainId
-                ); // Get order hash here
+                // Store order in database
+                logApiStep("STORING ORDER IN DATABASE", {
+                    orderHash: orderResult.hash,
+                    secretsCount: orderResult.secrets.length
+                });
 
                 const client = await getDbClient();
                 try {
                     await client.query(
-                        `INSERT INTO fusion_order_preparations (
-              preparation_id, live_quote_json, secrets_json, order_params_json, order_struct_json, quote_id, expires_at, extension_data, order_hash
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-                        [
-                            preparationId,
-                            JSON.stringify(liveQuote, replacer),
-                            JSON.stringify(secrets),
-                            JSON.stringify(crossChainOrderParams),
-                            JSON.stringify(orderStruct),
-                            fusionOrder.quoteId,
-                            expiresAt,
-                            extensionData,
-                            orderHash, // Store order hash
-                        ]
+                        `INSERT INTO fusion_orders (order_hash, secrets, status, attempts)
+                         VALUES ($1, $2, 'pending', 0)
+                         ON CONFLICT (order_hash) DO NOTHING`,
+                        [orderResult.hash, JSON.stringify(orderResult.secrets)]
                     );
+
+                    logApiSuccess("Order stored in database successfully", {
+                        orderHash: orderResult.hash,
+                        status: "pending"
+                    });
                 } finally {
                     await client.end();
                 }
 
-                return NextResponse.json({ preparationId, typedDataPayload });
+                logApiSuccess("CREATE SWAP REQUEST COMPLETED", {
+                    orderHash: orderResult.hash,
+                    status: "pending",
+                    message: "Order created and submitted successfully"
+                });
+
+                return NextResponse.json({
+                    orderHash: orderResult.hash,
+                    status: "pending",
+                    message: "Order created and submitted successfully",
+                });
             } catch (error: unknown) {
-                console.error("Error preparing order:", error);
-                const respStatus =
-                    getStatusFromError(error, 500) === 400 ? 400 : 500;
+                logApiError("Error creating swap", error);
                 return NextResponse.json(
                     { error: formatError(error) },
-                    { status: respStatus }
+                    { status: 500 }
                 );
             }
         }
-        const { preparationId, signature } = body as {
-            preparationId: string;
-            signature: string;
-        };
 
-        if (!preparationId || !signature) {
-            return NextResponse.json(
-                { error: "Missing preparationId or signature" },
-                { status: 400 }
-            );
-        }
-
-        const client = await getDbClient();
-        let prepData:
-            | {
-                  liveQuote: Quote;
-                  secrets: string[];
-                  orderParams: OrderParams;
-                  orderStruct: LimitOrderV4Struct;
-                  quoteId: string;
-                  extensionData: string;
-                  orderHash: string;
-              }
-            | undefined;
-
-        try {
-            const { rows } = await client.query(
-                "SELECT live_quote_json, secrets_json, order_params_json, order_struct_json, quote_id, expires_at, extension_data, order_hash FROM fusion_order_preparations WHERE preparation_id = $1",
-                [preparationId]
-            );
-
-            if (rows.length === 0) {
-                return NextResponse.json(
-                    { error: "Order preparation data not found" },
-                    { status: 404 }
-                );
-            }
-
-            const row = rows[0];
-            if (new Date(row.expires_at) < new Date()) {
-                // Data expired, delete it
-                await client.query(
-                    "DELETE FROM fusion_order_preparations WHERE preparation_id = $1",
-                    [preparationId]
-                );
-                return NextResponse.json(
-                    { error: "Order preparation data expired" },
-                    { status: 404 }
-                );
-            }
-
-            prepData = {
-                liveQuote: row.live_quote_json,
-                secrets: row.secrets_json,
-                orderParams: row.order_params_json,
-                orderStruct: row.order_struct_json as LimitOrderV4Struct,
-                quoteId: row.quote_id,
-                extensionData: row.extension_data,
-                orderHash: row.order_hash,
-            };
-
-            // Delete the preparation data after successful retrieval to prevent reuse
-            await client.query(
-                "DELETE FROM fusion_order_preparations WHERE preparation_id = $1",
-                [preparationId]
-            );
-
-            const srcChain = srcChainFromQuote(prepData.liveQuote);
-
-            // Submit via relayer request using the signed payload
-            const relayerRequestParams = {
-                srcChainId: srcChain,
-                order: prepData.orderStruct as LimitOrderV4Struct,
-                signature,
-                quoteId: prepData.quoteId,
-                extension: prepData.extensionData,
-                // Always include secretHashes (SDK/relayer tolerates single-item array)
-                secretHashes: prepData.orderParams.secretHashes,
-            };
-            const relayerRequest = new RelayerRequest(relayerRequestParams);
-            await sdk.api.submitOrder(relayerRequest);
-
-            const orderHash = prepData.orderHash; // Use stored order hash
-
-            await client.query(
-                `INSERT INTO fusion_orders (order_hash, secrets, status, attempts)
-         VALUES ($1, $2, 'pending', 0)
-         ON CONFLICT (order_hash) DO NOTHING`,
-                [orderHash, JSON.stringify(prepData.secrets)]
-            );
-
-            return NextResponse.json({ orderHash, status: "pending" });
-        } catch (error: unknown) {
-            console.error("Error placing signed order:", error);
-            // Try to include full response data for debugging
-            let body: { error: string; details?: unknown } = {
-                error: formatError(error),
-            };
-            try {
-                if (
-                    typeof error === "object" &&
-                    error !== null &&
-                    "response" in error &&
-                    (error as { response?: { data?: unknown } }).response
-                        ?.data !== undefined
-                ) {
-                    body = {
-                        error: formatError(error),
-                        details: (error as { response: { data?: unknown } })
-                            .response.data,
-                    };
-                }
-            } catch {}
-            const respStatus =
-                getStatusFromError(error, 500) === 400 ? 400 : 500;
-            return NextResponse.json(body, { status: respStatus });
-        } finally {
-            await client.end();
-        }
+        logApiError("Invalid action", { action });
+        return NextResponse.json(
+            { message: "Invalid action" },
+            { status: 400 }
+        );
     } catch (error: unknown) {
-        console.error("Unhandled error in POST handler:", error);
+        logApiError("Unhandled error in POST handler", error);
         return NextResponse.json(
             { error: formatError(error) },
             { status: 400 }

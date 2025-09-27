@@ -6,38 +6,37 @@
         "dev": "next dev --turbopack",
         "build": "next build",
         "start": "next start",
-        "lint": "next lint"
+        "lint": "next lint",
+        "test-logging": "node test-fusion-logging.js",
+        "dev-with-logs": "NODE_ENV=development next dev --turbopack"
     },
     "dependencies": {
-        "@1inch/cross-chain-sdk": "0.1.15-rc.0",
+        "@1inch/cross-chain-sdk": "^0.1.15",
         "@1inch/limit-order-sdk": "^5.0.0",
         "@reown/appkit": "1.7.8",
         "@reown/appkit-adapter-wagmi": "1.7.8",
         "@tailwindcss/postcss": "^4.1.13",
         "@tanstack/react-query": "^5.59.20",
         "dotenv": "^16.5.0",
-        "ethers": "^6.14.3",
+        "ethers": "^6.15.0",
         "next": "15.3.0",
-        "node-cache": "^5.1.2",
-        "pg": "^8.16.3",
-        "postcss": "^8.5.6",
-        "react": "19.0.0",
-        "react-dom": "19.0.0",
-        "tailwindcss": "^4.1.13",
-        "uuid": "^11.1.0",
-        "viem": "^2.21.44",
-        "wagmi": "^2.15.6",
-        "web3": "^4.16.0"
+        "pg": "^8.12.0",
+        "porto": "^0.2.19",
+        "react": "^19.0.0",
+        "react-dom": "^19.0.0",
+        "uuid": "^11.0.3",
+        "wagmi": "^2.12.15"
     },
     "devDependencies": {
-        "@types/node": "^22",
-        "@types/pg": "^8.15.4",
+        "@types/node": "^20",
+        "@types/pg": "^8.11.10",
         "@types/react": "^19",
         "@types/react-dom": "^19",
         "@types/uuid": "^10.0.0",
-        "eslint": "^9",
-        "eslint-config-next": "15.1.6",
+        "eslint": "^8",
+        "eslint-config-next": "15.3.0",
+        "postcss": "^8",
+        "tailwindcss": "^3.4.1",
         "typescript": "^5"
-    },
-    "packageManager": "pnpm@9.12.3+sha1.4fb96925d434c491285182acf29803bb9aa2e6e5"
+    }
 }

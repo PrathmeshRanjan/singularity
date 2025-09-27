@@ -6,7 +6,7 @@
 # Configuration
 APP_URL="http://localhost:3000"
 API_ENDPOINT="/api/recurring-payments-smart/process"
-LOG_FILE="/Users/prathmeshranjan/Desktop/singularity/logs/recurring-payments.log"
+LOG_FILE="/Users/prathmeshranjan/Desktop/singularity1/logs/recurring-payments.log"
 
 # Ensure the logs directory exists
 mkdir -p "$(dirname "$LOG_FILE")"
