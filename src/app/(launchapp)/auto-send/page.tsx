@@ -12,6 +12,8 @@ import { Plus } from "lucide-react";
 
 export default function AutoSendPage() {
   const [qrCode, setQrCode] = useState<string | null>(null);
+  // keep scannedData state if other logic relies on it elsewhere,
+  // but we won't render it anymore (no visible UI change).
   const [scannedData, setScannedData] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [logs, setLogs] = useState<Array<{id: string, message: string, timestamp: string, type: 'success' | 'error' | 'info'}>>([
@@ -45,19 +47,90 @@ export default function AutoSendPage() {
       if (videoRef.current) {
         qrScannerRef.current = new QrScanner(
           videoRef.current,
-          (result) => {
-            setScannedData(result.data);
-            setIsScanning(false);
-            qrScannerRef.current?.stop();
-            
-            const newLog = {
-              id: Date.now().toString(),
-              message: `QR scanned: ${result.data}`,
-              timestamp: new Date().toLocaleString(),
-              type: 'success' as const
-            };
-            setLogs(prev => [newLog, ...prev]);
-          },
+          // --- Replace the callback inside new QrScanner(videoRef.current, (result) => { ... }) ---
+(result) => {
+  // sanitize and normalize the scanned string
+  let scanned = String(result?.data ?? "").trim();
+  try {
+    scanned = decodeURIComponent(scanned);
+  } catch (e) {
+    // ignore decode errors
+  }
+
+  // keep internal state (in case other parts rely on it)
+  setScannedData(scanned);
+
+  // stop scanner first
+  qrScannerRef.current?.stop();
+  setIsScanning(false);
+
+  const newLog = {
+    id: Date.now().toString(),
+    message: `QR scanned: ${scanned}`,
+    timestamp: new Date().toLocaleString(),
+    type: "success" as const,
+  };
+  setLogs((prev) => [newLog, ...prev]);
+
+  // If scanned string doesn't contain "://" but looks like a domain, add https://
+  const looksLikeDomain = /^[\w.-]+\.[a-z]{2,}([\/:\?#]|$)/i.test(scanned);
+  if (!scanned.includes("://") && looksLikeDomain) {
+    scanned = "https://" + scanned;
+  }
+
+  // tiny delay to let scanner cleanup (helps on some devices/browsers)
+  setTimeout(() => {
+    // Primary: assign (navigates in same tab)
+    try {
+      window.location.assign(scanned);
+      return;
+    } catch (e) {
+      // fallback sequence below
+      console.warn("assign failed, falling back", e);
+    }
+
+    // Fallback 1: href
+    try {
+      window.location.href = scanned;
+      return;
+    } catch (e) {
+      console.warn("href failed", e);
+    }
+
+    // Fallback 2: open in same tab (should behave like assign)
+    try {
+      const opened = window.open(scanned, "_self");
+      if (opened) return;
+    } catch (e) {
+      console.warn("open _self failed", e);
+    }
+
+    // Fallback 3: create an anchor and click it (works for many schemes)
+    try {
+      const a = document.createElement("a");
+      a.href = scanned;
+      a.rel = "noopener noreferrer";
+      // if custom scheme, target _self to allow native handlers
+      a.target = "_self";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      return;
+    } catch (e) {
+      console.warn("anchor click fallback failed", e);
+    }
+
+    // Final fallback: log failure
+    const failLog = {
+      id: Date.now().toString(),
+      message: `Failed to navigate to scanned value: ${scanned}`,
+      timestamp: new Date().toLocaleString(),
+      type: "error" as const,
+    };
+    setLogs((prev) => [failLog, ...prev]);
+  }, 120); // 120ms delay
+},
+
           {
             highlightScanRegion: true,
             highlightCodeOutline: true,
@@ -166,6 +239,7 @@ export default function AutoSendPage() {
           if (imageData) {
             const code = jsQR(imageData.data, imageData.width, imageData.height);
             if (code) {
+              // Instead of showing scanned data, redirect immediately
               setScannedData(code.data);
               const newLog = {
                 id: Date.now().toString(),
@@ -174,6 +248,12 @@ export default function AutoSendPage() {
                 type: 'success' as const
               };
               setLogs(prev => [newLog, ...prev]);
+
+              try {
+                window.location.assign(code.data);
+              } catch (e) {
+                window.location.href = code.data;
+              }
             } else {
               const errorLog = {
                 id: Date.now().toString(),
@@ -236,13 +316,7 @@ export default function AutoSendPage() {
         </div>
       </div>
 
-      {/* Scanned Data Display */}
-      {scannedData && (
-        <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg max-w-md w-full">
-          <h3 className="font-semibold text-green-800 mb-2">Scanned Data:</h3>
-          <p className="text-green-700 break-all">{scannedData}</p>
-        </div>
-      )}
+      {/* NOTE: removed the visible Scanned Data panel per request so scan results aren't shown in UI */}
 
       {/* Hidden file input */}
       <input

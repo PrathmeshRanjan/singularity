@@ -36,7 +36,7 @@ export default function CardDashboard({
           <h1 className="text-gray-800 text-lg font-medium">Hello, {name}!</h1>
           <p className="text-gray-700 text-sm opacity-80">{subtitle}</p>
         </div>
-        <div className="w-16 h-16 rounded-2xl bg-gray-800 overflow-hidden">
+        <Link href="/profile" className="w-16 h-16 rounded-2xl bg-gray-800 overflow-hidden hover:opacity-80 transition-opacity cursor-pointer">
           {profileimage ? (
             <Image
               src={profileimage}
@@ -50,7 +50,7 @@ export default function CardDashboard({
               {name.charAt(0).toUpperCase()}
             </div>
           )}
-        </div>
+        </Link>
       </div>
 
       {/* Currency Tag */}

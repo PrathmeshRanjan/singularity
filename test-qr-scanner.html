@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Scanner Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .qr-code {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .test-url {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            word-break: break-all;
+        }
+        .instructions {
+            background: #f3e5f5;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 QR Scanner Test Page</h1>
+    
+    <div class="test-section">
+        <h2>Test URLs for QR Scanning</h2>
+        <p>Use these URLs to test your QR scanner:</p>
+        
+        <div class="test-url">
+            <strong>Regular URL:</strong><br>
+            https://www.google.com
+        </div>
+        
+        <div class="test-url">
+            <strong>Singularity Protocol URL:</strong><br>
+            signularity://send?amount=100&address=0x742d35Cc6634C0532925a3b8D4C9db96C4b4d8b6
+        </div>
+        
+        <div class="test-url">
+            <strong>Profile Page URL:</strong><br>
+            http://localhost:3000/profile
+        </div>
+        
+        <div class="test-url">
+            <strong>Auto-Send Create URL:</strong><br>
+            http://localhost:3000/auto-send/create
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h2>QR Code Generator</h2>
+        <p>Generate QR codes for testing:</p>
+        
+        <input type="text" id="urlInput" placeholder="Enter URL to generate QR code" style="width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px;">
+        <button onclick="generateQR()" style="background: #4CAF50; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;">Generate QR Code</button>
+        
+        <div id="qrContainer" class="qr-code"></div>
+    </div>
+    
+    <div class="instructions">
+        <h3>📋 Testing Instructions:</h3>
+        <ol>
+            <li>Start your Next.js development server: <code>npm run dev</code></li>
+            <li>Navigate to: <code>http://localhost:3000/auto-send</code></li>
+            <li>Allow camera permissions when prompted</li>
+            <li>Generate QR codes using the form above</li>
+            <li>Scan the QR codes with your camera</li>
+            <li>Verify that URLs automatically open in a new tab</li>
+            <li>Test the profile picture click to navigate to profile page</li>
+        </ol>
+    </div>
+    
+    <div class="test-section">
+        <h2>Expected Behavior:</h2>
+        <ul>
+            <li>✅ Camera should start automatically (with permission)</li>
+            <li>✅ QR codes should be detected and scanned</li>
+            <li>✅ URLs should automatically open in new tab after 1 second</li>
+            <li>✅ Non-URL data should be displayed without redirect</li>
+            <li>✅ Profile picture should be clickable and navigate to /profile</li>
+            <li>✅ Manual start button should work if auto-start fails</li>
+        </ul>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <script>
+        function generateQR() {
+            const url = document.getElementById('urlInput').value;
+            if (!url) {
+                alert('Please enter a URL');
+                return;
+            }
+            
+            const container = document.getElementById('qrContainer');
+            container.innerHTML = '';
+            
+            QRCode.toCanvas(url, { width: 200, margin: 2 }, function (error, canvas) {
+                if (error) {
+                    console.error(error);
+                    container.innerHTML = '<p style="color: red;">Error generating QR code</p>';
+                } else {
+                    container.appendChild(canvas);
+                    container.innerHTML += `<p style="margin-top: 10px; font-size: 12px; color: #666;">${url}</p>`;
+                }
+            });
+        }
+        
+        // Generate default QR codes on page load
+        window.onload = function() {
+            const defaultUrls = [
+                'https://www.google.com',
+                'signularity://send?amount=100&address=0x742d35Cc6634C0532925a3b8D4C9db96C4b4d8b6',
+                'http://localhost:3000/profile'
+            ];
+            
+            defaultUrls.forEach((url, index) => {
+                setTimeout(() => {
+                    document.getElementById('urlInput').value = url;
+                    generateQR();
+                }, index * 1000);
+            });
+        };
+    </script>
+</body>
+</html>
