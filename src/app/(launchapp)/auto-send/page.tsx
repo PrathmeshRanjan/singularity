@@ -6,8 +6,9 @@ import QRCode from "qrcode";
 import QrScanner from "qr-scanner";
 import jsQR from "jsqr";
 import { cn } from "@/lib/utils";
+import { Link } from "lucide-react";
+import { Folder } from "lucide-react";
 import { Plus } from "lucide-react";
-import Link from "next/link";
 
 export default function AutoSendPage() {
   const [qrCode, setQrCode] = useState<string | null>(null);
@@ -199,70 +200,120 @@ export default function AutoSendPage() {
   };
 
   return (
-    <div className="h-full flex gap-6">
-      {/* Left Side - QR Section */}
-      <div className="flex-1 flex flex-col">
-        
-        {/* Camera Video Element */}
-        <div className="my-4">
+    <div className="h-full flex flex-col justify-center items-center">
+      {/* Camera Video Element - Centered */}
+      <div className="flex justify-center mt-7 items-center flex-1">
+        <div className="relative">
           <video
             ref={videoRef}
-            className={`w-full h-64 rounded-lg ${isScanning ? 'block' : 'hidden'}`}
+            className={`w-80 h-80 rounded-2xl object-cover ${isScanning ? 'block' : 'hidden'}`}
             playsInline
+            style={{
+              filter: 'none'
+            }}
           />
+          
+          {/* Scanner Animation Overlay */}
+          {isScanning && (
+            <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none">
+              {/* Scanning Line Animation */}
+              <motion.div
+                className="absolute left-0 right-0 h-0.5 bg-green-500 shadow-lg"
+                animate={{
+                  y: [0, 320, 0]
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  ease: "linear"
+                }}
+                style={{
+                  boxShadow: '0 0 10px rgba(59, 130, 246, 0.8)'
+                }}
+              />
+            </div>
+          )}
         </div>
+      </div>
 
-        {/* Scanned Data Display */}
-        {scannedData && (
-          <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-            <h3 className="font-semibold text-green-800 mb-2">Scanned Data:</h3>
-            <p className="text-green-700 break-all">{scannedData}</p>
-          </div>
-        )}
+      {/* Scanned Data Display */}
+      {scannedData && (
+        <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg max-w-md w-full">
+          <h3 className="font-semibold text-green-800 mb-2">Scanned Data:</h3>
+          <p className="text-green-700 break-all">{scannedData}</p>
+        </div>
+      )}
 
-        {/* Action Buttons */}
-        <div className="flex cursor-pointer flex-col justify-center gap-4 max-w-xs mx-auto">
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={handleUploadQR}
-            className="flex-1 text-brand font-sans italic underline font-medium transition-colors"
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleFileChange}
+        className="hidden"
+      />
+
+      {/* Bottom Navigation Bar - Fixed at bottom */}
+      <div className="fixed bottom-0 left-1/2 transform -translate-x-1/2 w-full max-w-md px-4 py-3 mb-4 rounded-2xl shadow-lg">
+        <div className="flex justify-center items-center gap-8">
+         <motion.button
+            initial={{ width: 56 }}
+            whileHover={{ width: 168 }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+            className="group relative flex items-center overflow-hidden h-12 rounded-full px-3 cursor-pointer"
+            onClick={() => { handleUploadQR() }}
+            aria-label="Upload QR"
           >
-            📁 Upload QR Image
+            {/* pill inner styling */}
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center w-10 h-10 rounded-full">
+                <span className="text-xl"><Folder /></span>
+              </div>
+
+              {/* label */}
+              <span className="ml-1 text-sm text-gray-200 font-medium max-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 group-hover:max-w-[9rem]">
+                Upload QR
+              </span>
+            </div>
           </motion.button>
           
           <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={handleUploadLink}
-            className="flex-1 text-brand underline italic font-medium transition-colors"
+            initial={{ width: 56 }}
+            whileHover={{ width: 168 }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+            className="group relative flex items-center overflow-hidden h-12 rounded-full px-3 cursor-pointer"
+            onClick={() => { handleUploadLink() }}
+            aria-label="Upload Link"
           >
-            🔗 Upload a Link
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center w-10 h-10">
+                <span className="text-xl"><Link /></span>
+              </div>
+              <span className="ml-1 text-sm text-gray-200 font-medium max-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 group-hover:max-w-[9rem]">
+                Upload Link
+              </span>
+            </div>
           </motion.button>
 
-          <Link href="/auto-send/create">
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className={cn(
-                "rounded-full px-4 py-2 text-sm font-medium transition-colors",
-                "inline-block bg-black text-white"
-              )}
-            >
-              <Plus className="inline-block mr-2" />
-              Create a AutoPay
-            </motion.button>
-          </Link>
+          <motion.button
+            initial={{ width: 56 }}
+            whileHover={{ width: 168 }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+            className="group relative flex items-center overflow-hidden h-12 rounded-full px-3 cursor-pointer"
+            onClick={() => { /* handleUploadLink() */ }}
+            aria-label="Create Auto pay"
+          >
+            <Link href="/auto-send/create"/>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center w-10 h-10">
+                <span className="text-xl"><Plus/></span>
+              </div>
+              <span className="ml-1 text-sm text-gray-200 font-medium max-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 group-hover:max-w-[9rem]">
+                Create Auto pay
+              </span>
+            </div>
+          </motion.button>
         </div>
-
-        {/* Hidden file input */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          onChange={handleFileChange}
-          className="hidden"
-        />
       </div>
     </div>
   );

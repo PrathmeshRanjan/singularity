@@ -1,7 +1,10 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import React from "react";
+import profileimage from "../../../public/d73a78831e8a5491bfa80d0afd6c68fe.jpg"
 
 interface CardDashboardProps {
   name: string;
@@ -20,8 +23,10 @@ export default function CardDashboard({
   transaction,
   profileImage,
 }: CardDashboardProps) {
+  const pathname = usePathname();
+  
   return (
-    <div className="bg-gradient-to-br from-lime-300 via-green-400 to-emerald-500 rounded-3xl p-6 m-4 relative overflow-hidden">
+    <div className="bg-gradient-to-br from-lime-300 via-green-400 to-emerald-500 rounded-3xl p-4 m-2 relative overflow-hidden">
       {/* Overlay */}
       <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent" />
 
@@ -31,10 +36,10 @@ export default function CardDashboard({
           <h1 className="text-gray-800 text-lg font-medium">Hello, {name}!</h1>
           <p className="text-gray-700 text-sm opacity-80">{subtitle}</p>
         </div>
-        <div className="w-12 h-12 rounded-full bg-gray-800 overflow-hidden">
-          {profileImage ? (
+        <div className="w-16 h-16 rounded-2xl bg-gray-800 overflow-hidden">
+          {profileimage ? (
             <Image
-              src={profileImage}
+              src={profileimage}
               alt="Profile"
               width={48}
               height={48}
@@ -61,39 +66,39 @@ export default function CardDashboard({
       </div>
 
       {/* Buttons */}
-      <div className="flex gap-3 relative z-10">
-        <a 
+      <div className="flex gap-3 cursor-pointer relative z-10">
+        <Link 
           href="/auto-receive" 
           className={`flex-1 ${
-            window.location.pathname === '/auto-receive' 
+            pathname === '/auto-receive' 
               ? 'opacity-100' 
-              : 'opacity-80 hover:opacity-100'
+              : 'opacity-80 hover:opacity-100 text-green-800'
           }`}
         >
-          <button className={`w-full backdrop-blur-sm text-white py-3 px-4 rounded-2xl font-medium transition-colors ${
-            window.location.pathname === '/auto-receive'
-              ? 'bg-gray-900/90'
-              : 'bg-gray-800/80 hover:bg-gray-700/80'
+          <button className={`w-full hover:cursor-pointer backdrop-blur-sm py-3 px-4 rounded-2xl font-medium transition-colors ${
+            pathname === '/auto-receive'
+              ? 'bg-gray-900/90 text-white '
+              : 'hover:bg-white/40 text-green-800'
           }`}>
             Request
           </button>
-        </a>
-        <a 
+        </Link>
+        <Link 
           href="/auto-send" 
           className={`flex-1 ${
-            window.location.pathname === '/auto-send' 
+            pathname === '/auto-send' 
               ? 'opacity-100' 
-              : 'opacity-80 hover:opacity-100'
+              : 'opacity-80 hover:opacity-100 text-green-800'
           }`}
         >
-          <button className={`w-full backdrop-blur-sm text-white py-3 px-4 rounded-2xl font-medium transition-colors ${
-            window.location.pathname === '/auto-send'
-              ? 'bg-gray-900/90'
-              : 'bg-gray-800/80 hover:bg-gray-700/80'
+          <button className={`w-full backdrop-blur-sm cursor-pointer py-3 px-4 rounded-2xl font-medium transition-colors ${
+            pathname === '/auto-send'
+              ? 'bg-gray-900/90 text-white'
+              : 'hover:bg-white/40 text-black font-bold'
           }`}>
             Send
           </button>
-        </a>
+        </Link>
       </div>
     </div>
   );

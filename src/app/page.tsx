@@ -17,7 +17,7 @@ export default function Home() {
   };
 
   return (
-    <div className="bg-[var(--background)] text-[var(--foreground)]">
+    <div className="bg-white text-black">
       {/* Theme Toggle */}
       <ThemeToggle />
       
