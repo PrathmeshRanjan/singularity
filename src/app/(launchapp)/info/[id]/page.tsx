@@ -10,6 +10,7 @@ import {
   useWriteContract,
   useReadContract,
   useWaitForTransactionReceipt,
+  useSwitchChain,
 } from "wagmi";
 import { parseUnits } from "viem";
 
@@ -114,7 +115,8 @@ export default function InfoPage() {
   const [loading, setLoading] = useState(true);
 
   // Auto pay state
-  const { address, isConnected } = useAccount();
+  const { address, isConnected, chain } = useAccount();
+  const { switchChain } = useSwitchChain();
   const [autoPayLoading, setAutoPayLoading] = useState(false);
   const [autoPayError, setAutoPayError] = useState<string | null>(null);
   const [autoPaySuccess, setAutoPaySuccess] = useState<string | null>(null);
@@ -273,6 +275,20 @@ export default function InfoPage() {
       // Parse amount
       const amount = parseUnits(paymentData.amount, tokenDecimals);
 
+      // Check if we need to switch chains
+      if (chain?.id !== chainId) {
+        try {
+          await switchChain({ chainId });
+          // Wait a bit for the chain switch to complete
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        } catch (switchError) {
+          console.error("Failed to switch chain:", switchError);
+          setAutoPayError(`Please switch to ${CHAIN_NAMES[chainId]} network to create this subscription`);
+          setAutoPayLoading(false);
+          return;
+        }
+      }
+
       // First approve the token
       writeApprove({
         address: tokenAddress,
@@ -287,7 +303,7 @@ export default function InfoPage() {
       setAutoPayError(`Failed to create auto pay: ${errorMessage}`);
       setAutoPayLoading(false);
     }
-  }, [address, paymentData, writeApprove]);
+  }, [address, paymentData, writeApprove, chain?.id, switchChain]);
 
   // Handle approve success
   useEffect(() => {
