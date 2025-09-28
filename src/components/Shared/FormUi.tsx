@@ -4,12 +4,11 @@
 
 import type React from "react"
 
-import { useRef, useState, useMemo } from "react"
+import { useRef, useState } from "react"
 import { QRCodeSVG } from "qrcode.react"
-import { Download, Check, ChevronRight } from "lucide-react"
+import { Download } from "lucide-react"
 import { v4 as uuidv4 } from "uuid"
 import Link from "next/link"
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 
 type PaymentData = {
   network: string
@@ -118,248 +117,175 @@ export default function AnimatedAutoReceiveForm() {
     img.src = "data:image/svg+xml;base64," + btoa(svgData)
   }
 
-  // Completion checks for visual cues and progressive steps
-  const isRecipientComplete = !!(formData.orgName && formData.amount && formData.walletAddress)
-  const isScheduleComplete = !!(formData.frequency && formData.duration)
-  const isAllRequiredDone = isRecipientComplete && isScheduleComplete
-
-  // Section descriptors (used to mimic the “list entries” when expanded)
-  const sections = useMemo(
-    () => [
-      {
-        id: "recipient",
-        title: "Recipient details",
-        subtitle: "Name, amount, and ETH address",
-        complete: isRecipientComplete,
-      },
-      {
-        id: "schedule",
-        title: "Schedule",
-        subtitle: "Frequency and duration",
-        complete: isScheduleComplete,
-      },
-      {
-        id: "notes",
-        title: "Description",
-        subtitle: "Optional notes",
-        complete: !!formData.description,
-      },
-    ],
-    [formData, isRecipientComplete, isScheduleComplete],
-  )
+  // Simple validation check
+  const isAllRequiredDone = !!(formData.orgName && formData.amount && formData.walletAddress && formData.frequency && formData.duration)
 
   // Reusable helpers
   const fieldBase =
-    "w-full rounded-lg border bg-white text-black transition-all outline-none focus:ring-2 focus:ring-gray-300 p-3"
-  const fieldComplete = "border-gray-400 ring-2 ring-gray-200"
-  const fieldIncomplete = "border-gray-200"
+    "w-full rounded-lg border bg-[#0c0c0c]/50 backdrop-blur-sm text-white transition-all outline-none focus:ring-2 focus:ring-green-500 p-3 placeholder:text-gray-400"
+  const fieldComplete = "border-gray-600 bg-[#0c0c0c]/50"
+  const fieldIncomplete = "border-gray-600"
 
   return (
-    <div className="mx-auto w-full text-black">
-
-      {/* Expandable content with smooth animation and list-like entries */}
-      <div className="mt-3 rounded-2xl p-2 md:p-3 space-y-3">
-        <Accordion type="single" collapsible className="w-full" defaultValue="recipient">
-          {/* Entry list (Recipient) */}
-          <AccordionItem value="recipient" className="border-0">
-            <AccordionTrigger className="rounded-lg px-4 py-3 border border-gray-200 hover:border-gray-300 hover:bg-gray-50 data-[state=open]:border-gray-300 data-[state=open]:bg-gray-50 hover:no-underline transition-all">
-              <div className="flex w-full items-center justify-between">
-                <div className="flex flex-col text-left">
-                  <span className="text-base font-medium">{sections[0].title}</span>
-                  <span className="text-sm text-gray-600">{sections[0].subtitle}</span>
-                </div>
-                {sections[0].complete ? (
-                  <Check className="h-5 w-5 text-black" aria-label="Completed" />
-                ) : (
-                  <ChevronRight className="h-5 w-5 text-gray-400" aria-hidden />
-                )}
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="px-1 pt-2 md:px-2">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div className="md:col-span-2">
-                  <label className="mb-2 block text-sm font-medium">Organization/Person Name</label>
-                  <input
-                    name="orgName"
-                    placeholder="Enter name"
-                    className={`${fieldBase} ${formData.orgName ? fieldComplete : fieldIncomplete}`}
-                    value={formData.orgName}
-                    onChange={handleChange}
-                    aria-required="true"
-                    aria-invalid={!formData.orgName}
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium">Amount</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    name="amount"
-                    placeholder="0.00"
-                    className={`${fieldBase} ${formData.amount ? fieldComplete : fieldIncomplete}`}
-                    value={formData.amount}
-                    onChange={handleChange}
-                    aria-required="true"
-                    aria-invalid={!formData.amount}
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-medium">Your ETH Address</label>
-                  <input
-                    name="walletAddress"
-                    placeholder="0x..."
-                    className={`${fieldBase} ${formData.walletAddress ? fieldComplete : fieldIncomplete}`}
-                    value={formData.walletAddress}
-                    onChange={handleChange}
-                    aria-required="true"
-                    aria-invalid={!formData.walletAddress}
-                  />
-                </div>
-              </div>
-              <p className="mt-3 text-xs text-gray-600">
-                {"All three fields are required. You can edit them later anytime."}
-              </p>
-            </AccordionContent>
-          </AccordionItem>
-
-          {/* Entry list (Schedule) */}
-          <AccordionItem value="schedule" className="border-0">
-            <AccordionTrigger className="rounded-lg px-4 py-3 border border-gray-200 hover:border-gray-300 hover:bg-gray-50 data-[state=open]:border-gray-300 data-[state=open]:bg-gray-50 hover:no-underline transition-all">
-              <div className="flex w-full items-center justify-between">
-                <div className="flex flex-col text-left">
-                  <span className="text-base font-medium">{sections[1].title}</span>
-                  <span className="text-sm text-gray-600">{sections[1].subtitle}</span>
-                </div>
-                {sections[1].complete ? (
-                  <Check className="h-5 w-5 text-black" aria-label="Completed" />
-                ) : (
-                  <ChevronRight className="h-5 w-5 text-gray-400" aria-hidden />
-                )}
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="px-1 pt-2 md:px-2">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div>
-                  <label className="mb-2 block text-sm font-medium">Payment Frequency</label>
-                  <select
-                    name="frequency"
-                    className={`${fieldBase} ${formData.frequency ? fieldComplete : fieldIncomplete}`}
-                    value={formData.frequency}
-                    onChange={handleChange}
-                    aria-required="true"
-                  >
-                    {frequencyOptions.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-2 block text-sm font-medium">Duration</label>
-                  <select
-                    name="duration"
-                    className={`${fieldBase} ${formData.duration ? fieldComplete : fieldIncomplete}`}
-                    value={formData.duration}
-                    onChange={handleChange}
-                    aria-required="true"
-                  >
-                    {durationOptions.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <p className="mt-3 text-xs text-gray-600">
-                {"Choose how often payments repeat and for how long."}
-              </p>
-            </AccordionContent>
-          </AccordionItem>
-
-          {/* Entry list (Description - optional) */}
-          <AccordionItem value="notes" className="border-0">
-            <AccordionTrigger className="rounded-lg px-4 py-3 border border-gray-200 hover:border-gray-300 hover:bg-gray-50 data-[state=open]:border-gray-300 data-[state=open]:bg-gray-50 hover:no-underline transition-all">
-              <div className="flex w-full items-center justify-between">
-                <div className="flex flex-col text-left">
-                  <span className="text-base font-medium">{sections[2].title}</span>
-                  <span className="text-sm text-gray-600">{sections[2].subtitle}</span>
-                </div>
-                {sections[2].complete ? (
-                  <Check className="h-5 w-5 text-black" aria-label="Completed" />
-                ) : (
-                  <ChevronRight className="h-5 w-5 text-gray-400" aria-hidden />
-                )}
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="px-1 pt-2 md:px-2">
-              <label className="mb-2 block text-sm font-medium">Description (optional)</label>
-              <textarea
-                name="description"
-                rows={3}
-                placeholder="Payment description or notes..."
-                className={`${fieldBase} ${formData.description ? fieldComplete : fieldIncomplete} resize-none`}
-                value={formData.description}
+    <div className="max-h-130 overflow-y-auto scrollbar-hide mx-auto w-full max-w-2xl text-white">
+      {/* Simple Form Container */}
+      <div className="bg-[#0c0c0c]/50 backdrop-blur-sm rounded-2xl p-6 shadow-lg">
+        
+        {/* Recipient Details Section */}
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold text-white mb-4">Recipient Details</h2>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="md:col-span-2">
+              <label className="mb-2 block text-sm font-medium text-white">Organization/Person Name *</label>
+              <input
+                name="orgName"
+                placeholder="Enter name"
+                className={`${fieldBase} ${formData.orgName ? fieldComplete : fieldIncomplete}`}
+                value={formData.orgName}
                 onChange={handleChange}
+                aria-required="true"
+                aria-invalid={!formData.orgName}
               />
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-medium text-white">Amount *</label>
+              <input
+                type="number"
+                step="0.01"
+                name="amount"
+                placeholder="0.00"
+                className={`${fieldBase} ${formData.amount ? fieldComplete : fieldIncomplete}`}
+                value={formData.amount}
+                onChange={handleChange}
+                aria-required="true"
+                aria-invalid={!formData.amount}
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-medium text-white">Your ETH Address *</label>
+              <input
+                name="walletAddress"
+                placeholder="0x..."
+                className={`${fieldBase} ${formData.walletAddress ? fieldComplete : fieldIncomplete}`}
+                value={formData.walletAddress}
+                onChange={handleChange}
+                aria-required="true"
+                aria-invalid={!formData.walletAddress}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Schedule Section */}
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold text-white mb-4">Payment Schedule</h2>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div>
+              <label className="mb-2 block text-sm font-medium text-white">Payment Frequency *</label>
+              <select
+                name="frequency"
+                className={`${fieldBase} ${formData.frequency ? fieldComplete : fieldIncomplete}`}
+                value={formData.frequency}
+                onChange={handleChange}
+                aria-required="true"
+              >
+                {frequencyOptions.map((o) => (
+                  <option key={o.value} value={o.value} className="bg-[#0c0c0c] text-white">
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium text-white">Duration *</label>
+              <select
+                name="duration"
+                className={`${fieldBase} ${formData.duration ? fieldComplete : fieldIncomplete}`}
+                value={formData.duration}
+                onChange={handleChange}
+                aria-required="true"
+              >
+                {durationOptions.map((o) => (
+                  <option key={o.value} value={o.value} className="bg-[#0c0c0c] text-white">
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Description Section */}
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold text-white mb-4">Additional Information</h2>
+          <div>
+            <label className="mb-2 block text-sm font-medium text-white">Description (optional)</label>
+            <textarea
+              name="description"
+              rows={3}
+              placeholder="Payment description or notes..."
+              className={`${fieldBase} ${formData.description ? fieldComplete : fieldIncomplete} resize-none`}
+              value={formData.description}
+              onChange={handleChange}
+            />
+          </div>
+        </div>
 
         {/* Fixed fields shown read-only, per your spec */}
         <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
-            <label className="mb-2 block text-sm font-medium">Network</label>
+            <label className="mb-2 block text-sm font-medium text-white">Network</label>
             <input
               name="network"
               value="ETH"
               disabled
-              className="w-full cursor-not-allowed rounded-lg border border-gray-200 bg-gray-50 p-3 text-gray-600"
+              className="w-full cursor-not-allowed rounded-lg border border-gray-600 bg-[#0c0c0c]/30 p-3 text-gray-400"
             />
           </div>
           <div>
-            <label className="mb-2 block text-sm font-medium">Token</label>
+            <label className="mb-2 block text-sm font-medium text-white">Token</label>
             <input
               name="token"
               value="PYUSD"
               disabled
-              className="w-full cursor-not-allowed rounded-lg border border-gray-200 bg-gray-50 p-3 text-gray-600"
+              className="w-full cursor-not-allowed rounded-lg border border-gray-600 bg-[#0c0c0c]/30 p-3 text-gray-400"
             />
           </div>
         </div>
 
         {/* Submission */}
-        <button
-          onClick={handleSubmit}
-          disabled={!isAllRequiredDone}
-          className="mt-5 w-full rounded-lg bg-black px-4 py-3 font-medium text-white transition-all enabled:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
-          aria-disabled={!isAllRequiredDone}
-        >
-          Generate Payment QR Code
-        </button>
+        <div className="flex justify-center">
+          <button
+            onClick={handleSubmit}
+            disabled={!isAllRequiredDone}
+            className="mt-7 py-1 w-[40%] rounded-2xl text-black bg-white text-[16px] disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+            aria-disabled={!isAllRequiredDone}
+          >
+            Generate Auto Pay QR
+          </button>
+        </div>
 
         {/* QR Preview & actions */}
         {qrId && (
           <div className="mt-8 text-center">
-            <div ref={qrRef} className="inline-block rounded-lg border border-gray-200 bg-white p-4">
+            <div ref={qrRef} className="inline-block rounded-lg border border-green-300/20 bg-white p-4 shadow-lg">
               <QRCodeSVG value={`${window.location.origin}/info/${qrId}`} size={200} level="M" />
             </div>
             <div className="mt-4 space-y-2">
-              <p className="text-sm text-gray-600">Scan this QR code to view payment details</p>
+              <p className="text-sm text-gray-300">Scan this QR code to view payment details</p>
               <div className="flex justify-center gap-4">
                 <button
                   onClick={downloadQR}
-                  className="flex items-center gap-2 rounded-lg bg-black px-4 py-2 font-medium text-white transition-colors hover:bg-gray-800"
+                  className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-green-500 to-blue-500 px-4 py-2 font-medium text-white transition-colors hover:from-green-600 hover:to-blue-600 shadow-lg"
                 >
                   <Download size={16} />
                   Download QR
                 </button>
                 <Link
                   href={`/info/${qrId}`}
-                  className="flex items-center gap-2 rounded-lg bg-white border border-gray-300 px-4 py-2 font-medium text-black transition-colors hover:bg-gray-50"
+                  className="flex items-center gap-2 rounded-lg bg-[#0c0c0c]/50 border border-green-300/20 px-4 py-2 font-medium text-white transition-colors hover:bg-[#0c0c0c]/70 hover:border-green-300/40"
                 >
                   View Details
                 </Link>

@@ -14,22 +14,26 @@ const MOVE_STAGES = [
 
 interface AnimatedTextProps {
   text: string;
+  description?: string;
   showButton?: boolean;
   buttonText?: string;
   onButtonClick?: () => void;
   className?: string;
   scribbleColor?: string;
   textColor?: string;
+  descriptionColor?: string;
 }
 
 export default function AnimatedText({ 
   text, 
+  description,
   showButton = false, 
   buttonText = "Launch App",
   onButtonClick,
   className = "",
   scribbleColor = "#d4f607",
-  textColor = "#a66bff"
+  textColor = "#a66bff",
+  descriptionColor = "#ffffff"
 }: AnimatedTextProps) {
   const [moveStage, setMoveStage] = useState(0);
   const [scribble, setScribble] = useState(false);
@@ -58,7 +62,9 @@ export default function AnimatedText({
   }, []);
 
   return (
-    <span className={`relative inline-block ${className}`}>
+    <div className={`relative inline-block ${className}`}>
+      {/* Description text above the main text */}
+      
       <AnimatePresence mode="wait">
         <motion.span
           key={moveStage}
@@ -131,6 +137,6 @@ export default function AnimatedText({
           )}
         </AnimatePresence>
       )}
-    </span>
+    </div>
   );
 }

@@ -77,22 +77,17 @@ export default function HeroSection({ onScroll }: HeroSectionProps) {
       </div>
       
       {/* Centered Text */}
-      <div ref={heroTextRef} className="flex flex-1 items-center justify-center will-change-transform">
-        <h1
-          className="text-[36px] sm:text-[48px] md:text-[72px] lg:text-[96px] font-sans text-center font-bold leading-[1.05] sm:leading-[1] break-words"
-          style={{ fontFamily: "'Unbounded', sans-serif" }}
-        >
-          Make <span className="text-[#a66bff]">Your</span>
-          <br />
-          <span className="text-[#a66bff]">finances</span>
-          <br />
+      <div className="fixed inset-0 flex items-center justify-center z-10 bg-transparent pointer-events-none">
+        <div className="pointer-events-auto flex flex-col items-center justify-center w-full">
           <AnimatedText 
-            text="Move" 
+            text="Singularity"
             showButton={true}
             buttonText="Launch App"
             onButtonClick={handleLaunchAppClick}
+            className="text-[40px] sm:text-[56px] md:text-[72px] text-[#a66bff] font-extrabold text-center leading-tight"
+            textColor="var(--foreground)"
           />
-        </h1>
+        </div>
       </div>
       
       {/* Right Side Image */}

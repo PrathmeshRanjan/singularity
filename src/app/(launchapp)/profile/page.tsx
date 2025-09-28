@@ -169,17 +169,17 @@ export default function ProfilePage() {
                             href="/"
                             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                         >
-                            <ArrowLeft size={20} className="text-gray-600" />
+                            <ArrowLeft size={20} className="text-white" />
                         </Link>
                         <div>
-                            <h1 className="text-2xl font-bold text-gray-800">My Subscriptions</h1>
-                            <p className="text-gray-600">Manage your recurring payments</p>
+                            <h1 className="text-2xl font-bold text-white">My Subscriptions</h1>
+                            <p className="text-white">Manage your recurring payments</p>
                         </div>
                     </div>
                     <button
                         onClick={fetchSubscriptions}
                         disabled={loading}
-                        className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50"
+                        className="flex items-center text-black gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50"
                     >
                         <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
                         Refresh

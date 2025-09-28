@@ -26,15 +26,14 @@ export default function CardDashboard({
   const pathname = usePathname();
   
   return (
-    <div className="bg-gradient-to-br from-lime-300 via-green-400 to-emerald-500 rounded-3xl p-4 m-2 relative overflow-hidden">
+    <div className="bg-gradient-to-br from-lime-300 via-green-400 to-emerald-500 rounded-3xl p-5 m-3 relative overflow-hidden">
       {/* Overlay */}
       <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent" />
 
       {/* Header */}
       <div className="flex justify-between items-start mb-6 relative z-10">
         <div>
-          <h1 className="text-gray-800 text-lg font-medium">Hello, {name}!</h1>
-          <p className="text-gray-700 text-sm opacity-80">{subtitle}</p>
+          <h1 className="text-gray-800 text-lg font-medium"></h1>
         </div>
         <Link href="/profile" className="w-16 h-16 rounded-2xl bg-gray-800 overflow-hidden hover:opacity-80 transition-opacity cursor-pointer">
           {profileimage ? (

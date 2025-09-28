@@ -2,12 +2,12 @@ import { ethers } from "ethers";
 import { Client } from "pg";
 import crypto from "crypto";
 
-const ONEINCH_API_KEY = process.env.ONEINCH_API_KEY;
+const DEV_PORTAL_KEY = process.env.ONEINCH_API_KEY;
 const DATABASE_URL = process.env.DATABASE_URL;
 
-if (!ONEINCH_API_KEY || !DATABASE_URL) {
+if (!DEV_PORTAL_KEY || !DATABASE_URL) {
     throw new Error(
-        "Missing required environment variables: ONEINCH_API_KEY or DATABASE_URL"
+        "Missing required environment variables: DEV_PORTAL_KEY or DATABASE_URL"
     );
 }
 
@@ -43,7 +43,7 @@ export interface PaymentExecution {
 
 // Contract addresses - Updated with deployed contract
 const CONTRACT_ADDRESSES: Record<number, string> = {
-    8453: "0xacfDc1080a1D3839767b3714F581994958830754", // Base - DEPLOYED
+    8453: "0x3086b99Bd6B955cd235F450579Ef6F496807BD09", // Base - DEPLOYED
     1: "0x0000000000000000000000000000000000000000", // Ethereum
     42161: "0x0000000000000000000000000000000000000000", // Arbitrum
     137: "0x0000000000000000000000000000000000000000", // Polygon

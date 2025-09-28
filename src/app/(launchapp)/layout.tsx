@@ -27,8 +27,8 @@ export default function LaunchAppLayout({
   }
 
   return (
-    <div className="h-screen bg-white flex items-center justify-center p-4">
-      <main className="relative h-[98vh] overflow-hidden bg-[#0c0c0c] backdrop-blur-sm border rounded-2xl md:w-[45%]">
+    <div className="h-screen bg-black flex items-center justify-center p-4">
+      <main className="relative h-[98vh] overflow-hidden border-green-300 p  bg-[#0c0c0c] backdrop-blur-sm border rounded-2xl md:w-[45%]">
         {/* Glowy background layer (pointer-events-none keeps it non-interactive) */}
         <div className="absolute inset-0 pointer-events-none">
           <GlowyBackground />

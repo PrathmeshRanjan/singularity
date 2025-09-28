@@ -47,89 +47,78 @@ export default function AutoSendPage() {
       if (videoRef.current) {
         qrScannerRef.current = new QrScanner(
           videoRef.current,
-          // --- Replace the callback inside new QrScanner(videoRef.current, (result) => { ... }) ---
-(result) => {
-  // sanitize and normalize the scanned string
-  let scanned = String(result?.data ?? "").trim();
-  try {
-    scanned = decodeURIComponent(scanned);
-  } catch (e) {
-    // ignore decode errors
-  }
+          (result) => {
+            // Sanitize and normalize the scanned string
+            let scanned = String(result?.data ?? "").trim();
+            
+            // Decode URI if possible
+            try {
+              scanned = decodeURIComponent(scanned);
+            } catch (e) {
+              // ignore decode errors
+            }
 
-  // keep internal state (in case other parts rely on it)
-  setScannedData(scanned);
+            console.log("QR Code scanned:", scanned);
 
-  // stop scanner first
-  qrScannerRef.current?.stop();
-  setIsScanning(false);
+            // Keep internal state
+            setScannedData(scanned);
 
-  const newLog = {
-    id: Date.now().toString(),
-    message: `QR scanned: ${scanned}`,
-    timestamp: new Date().toLocaleString(),
-    type: "success" as const,
-  };
-  setLogs((prev) => [newLog, ...prev]);
+            // Stop scanner immediately
+            if (qrScannerRef.current) {
+              qrScannerRef.current.stop();
+            }
+            setIsScanning(false);
 
-  // If scanned string doesn't contain "://" but looks like a domain, add https://
-  const looksLikeDomain = /^[\w.-]+\.[a-z]{2,}([\/:\?#]|$)/i.test(scanned);
-  if (!scanned.includes("://") && looksLikeDomain) {
-    scanned = "https://" + scanned;
-  }
+            // Add success log
+            const newLog = {
+              id: Date.now().toString(),
+              message: `QR scanned: ${scanned}`,
+              timestamp: new Date().toLocaleString(),
+              type: "success" as const,
+            };
+            setLogs((prev) => [newLog, ...prev]);
 
-  // tiny delay to let scanner cleanup (helps on some devices/browsers)
-  setTimeout(() => {
-    // Primary: assign (navigates in same tab)
-    try {
-      window.location.assign(scanned);
-      return;
-    } catch (e) {
-      // fallback sequence below
-      console.warn("assign failed, falling back", e);
-    }
+            // Process the scanned URL
+            let processedUrl = scanned;
 
-    // Fallback 1: href
-    try {
-      window.location.href = scanned;
-      return;
-    } catch (e) {
-      console.warn("href failed", e);
-    }
+            // If it doesn't contain "://" but looks like a domain, add https://
+            const looksLikeDomain = /^[\w.-]+\.[a-z]{2,}([\/:\?#]|$)/i.test(scanned);
+            if (!scanned.includes("://") && looksLikeDomain) {
+              processedUrl = "https://" + scanned;
+            }
 
-    // Fallback 2: open in same tab (should behave like assign)
-    try {
-      const opened = window.open(scanned, "_self");
-      if (opened) return;
-    } catch (e) {
-      console.warn("open _self failed", e);
-    }
+            // Validate URL
+            try {
+              new URL(processedUrl);
+            } catch (e) {
+              console.error("Invalid URL:", processedUrl);
+              const errorLog = {
+                id: Date.now().toString(),
+                message: `Invalid URL scanned: ${scanned}`,
+                timestamp: new Date().toLocaleString(),
+                type: "error" as const,
+              };
+              setLogs((prev) => [errorLog, ...prev]);
+              return;
+            }
 
-    // Fallback 3: create an anchor and click it (works for many schemes)
-    try {
-      const a = document.createElement("a");
-      a.href = scanned;
-      a.rel = "noopener noreferrer";
-      // if custom scheme, target _self to allow native handlers
-      a.target = "_self";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      return;
-    } catch (e) {
-      console.warn("anchor click fallback failed", e);
-    }
-
-    // Final fallback: log failure
-    const failLog = {
-      id: Date.now().toString(),
-      message: `Failed to navigate to scanned value: ${scanned}`,
-      timestamp: new Date().toLocaleString(),
-      type: "error" as const,
-    };
-    setLogs((prev) => [failLog, ...prev]);
-  }, 120); // 120ms delay
-},
+            // Navigate immediately without delay
+            console.log("Navigating to:", processedUrl);
+            
+            // Use window.location.href for reliable navigation
+            try {
+              window.location.href = processedUrl;
+            } catch (e) {
+              console.error("Navigation failed:", e);
+              const failLog = {
+                id: Date.now().toString(),
+                message: `Failed to navigate to: ${processedUrl}`,
+                timestamp: new Date().toLocaleString(),
+                type: "error" as const,
+              };
+              setLogs((prev) => [failLog, ...prev]);
+            }
+          },
 
           {
             highlightScanRegion: true,
@@ -239,20 +228,68 @@ export default function AutoSendPage() {
           if (imageData) {
             const code = jsQR(imageData.data, imageData.width, imageData.height);
             if (code) {
-              // Instead of showing scanned data, redirect immediately
-              setScannedData(code.data);
+              // Process the scanned data
+              let scanned = String(code.data).trim();
+              
+              // Decode URI if possible
+              try {
+                scanned = decodeURIComponent(scanned);
+              } catch (e) {
+                // ignore decode errors
+              }
+
+              console.log("QR Code extracted from image:", scanned);
+
+              // Keep internal state
+              setScannedData(scanned);
+
+              // Add success log
               const newLog = {
                 id: Date.now().toString(),
-                message: `QR extracted from image: ${code.data}`,
+                message: `QR extracted from image: ${scanned}`,
                 timestamp: new Date().toLocaleString(),
                 type: 'success' as const
               };
               setLogs(prev => [newLog, ...prev]);
 
+              // Process the scanned URL
+              let processedUrl = scanned;
+
+              // If it doesn't contain "://" but looks like a domain, add https://
+              const looksLikeDomain = /^[\w.-]+\.[a-z]{2,}([\/:\?#]|$)/i.test(scanned);
+              if (!scanned.includes("://") && looksLikeDomain) {
+                processedUrl = "https://" + scanned;
+              }
+
+              // Validate URL
               try {
-                window.location.assign(code.data);
+                new URL(processedUrl);
               } catch (e) {
-                window.location.href = code.data;
+                console.error("Invalid URL:", processedUrl);
+                const errorLog = {
+                  id: Date.now().toString(),
+                  message: `Invalid URL from image: ${scanned}`,
+                  timestamp: new Date().toLocaleString(),
+                  type: "error" as const,
+                };
+                setLogs((prev) => [errorLog, ...prev]);
+                return;
+              }
+
+              // Navigate immediately
+              console.log("Navigating to:", processedUrl);
+              
+              try {
+                window.location.href = processedUrl;
+              } catch (e) {
+                console.error("Navigation failed:", e);
+                const failLog = {
+                  id: Date.now().toString(),
+                  message: `Failed to navigate to: ${processedUrl}`,
+                  timestamp: new Date().toLocaleString(),
+                  type: "error" as const,
+                };
+                setLogs((prev) => [failLog, ...prev]);
               }
             } else {
               const errorLog = {

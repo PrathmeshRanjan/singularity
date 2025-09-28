@@ -109,7 +109,7 @@ export default function WalletOption({ onEvmConnect, onBtcPrivateKey }: WalletOp
               </div>
               
               <Button 
-                onClick={handleBtcKeySubmit}
+                onClick={() => window.location.href = "http://localhost:3002"}
                 disabled={!btcPrivateKey.trim()}
                 className="w-full gradient-purple hover:opacity-90 transition-all duration-300 font-semibold rounded-xl hover:scale-[1.02] shadow-lg disabled:opacity-50 disabled:hover:scale-100"
               >
