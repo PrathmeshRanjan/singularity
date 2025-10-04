@@ -226,27 +226,19 @@ graph TD
         C --> D[Fund HTLC with BTC]
         D --> E[Monitor HTLC Funding]
     end
-    
-    subgraph "Phase 2: Escrow Deployment"
-        E --> F[Deploy Escrow Contract]
-        F --> G[Escrow Address<br/>0x777c5966E8327EbEcAbB21b043ACeDE9acBaCA7B]
-        G --> H[Transfer PYUSD to Escrow]
-        H --> I[Escrow Holds PYUSD]
-    end
-    
-    subgraph "Phase 3: Secret Revelation"
+    subgraph "Phase 2: Secret Revelation"
         I --> J[HTLC Funding Detected]
         J --> K[Reveal Secret to Escrow]
         K --> L[Escrow Releases PYUSD]
         L --> M[User Receives PYUSD]
     end
     
-    subgraph "Phase 4: BTC Claiming"
+    subgraph "Phase 3: BTC Claiming"
         M --> N[Resolver Claims BTC]
         N --> O[BTC Sent to Recipient<br/>tb1qpfrsr2k3t928vpuvrz0l4vdl3yyvpgwxleugmp]
     end
     
-    subgraph "Phase 5: AutoPay (Optional)"
+    subgraph "Phase 4: AutoPay (Optional)"
         O --> P[Deploy AutoPay Contract]
         P --> Q[Fund AutoPay with PYUSD]
         Q --> R[Start Recurring Payments]
